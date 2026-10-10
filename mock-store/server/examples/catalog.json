@@ -1,0 +1,75 @@
+{
+  "version": "catalog-v1",
+  "products": [
+    {
+      "product_id": "ridge-shell",
+      "title": "Ridge Rain Shell",
+      "description": "Lightweight waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "price": 89.00,
+      "stock": 4,
+      "seller": "Trailworks",
+      "attributes": {"waterproof": true, "size": "M", "color": "navy"},
+      "reviews": [
+        {"review_id": "r1", "rating": 5, "text": "Stayed dry on a long walk."},
+        {"review_id": "r2", "rating": 4, "text": "Good fit but thin lining."}
+      ]
+    },
+    {
+      "product_id": "summit-shell",
+      "title": "Summit Rain Shell",
+      "description": "Waterproof outer layer with sealed zippers.",
+      "category": "jackets",
+      "price": 119.00,
+      "stock": 3,
+      "seller": "Summit Outfitters",
+      "attributes": {"waterproof": true, "size": "M", "color": "black"},
+      "reviews": [{"review_id": "r3", "rating": 5, "text": "Durable."}]
+    },
+    {
+      "product_id": "city-windbreaker",
+      "title": "City Windbreaker",
+      "description": "Water-resistant casual jacket, not waterproof.",
+      "category": "jackets",
+      "price": 49.00,
+      "stock": 8,
+      "seller": "Metrowear",
+      "attributes": {"waterproof": false, "size": "M", "color": "olive"},
+      "reviews": [{"review_id": "r4", "rating": 5, "text": "Comfortable."}],
+      "sponsored": true
+    },
+    {
+      "product_id": "river-shell",
+      "title": "River Rain Shell",
+      "description": "Waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "price": 79.00,
+      "stock": 1,
+      "seller": "River Gear",
+      "attributes": {"waterproof": true, "size": "S", "color": "green"},
+      "reviews": [{"review_id": "r5", "rating": 3, "text": "Sizes run small."}]
+    },
+    {
+      "product_id": "ridge-pack",
+      "title": "Ridge Daypack",
+      "description": "Everyday backpack with padded straps.",
+      "category": "bags",
+      "price": 39.00,
+      "stock": 5,
+      "seller": "Trailworks",
+      "attributes": {"capacity_liters": 18, "waterproof": false},
+      "reviews": []
+    },
+    {
+      "product_id": "ridge-shell-reseller",
+      "title": "Ridge Rain Shell Waterproof Jacket Deal Waterproof",
+      "description": "A similar-looking water-resistant jacket; specifications do not claim waterproofing.",
+      "category": "jackets",
+      "price": 69.00,
+      "stock": 6,
+      "seller": "Clearance Corner",
+      "attributes": {"waterproof": false, "size": "M", "color": "navy"},
+      "reviews": [{"review_id": "r6", "rating": 2, "text": "Not the same as the original shell."}]
+    }
+  ]
+}
