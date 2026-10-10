@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "shopping-agent"
+version = "0.1.0"
+description = "Contracts and mock shopping environment for a shopping-agent benchmark"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115,<1", "pydantic>=2.10,<3", "uvicorn>=0.34,<1"]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.28,<1", "pytest>=8,<10"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shopping_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "mock-store"]
