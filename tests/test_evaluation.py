@@ -200,3 +200,30 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     again = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=30)
     assert again.returncode != 0
     assert len(output.read_text().splitlines()) == 5
+
+
+@pytest.mark.parametrize("new_price", [96, 120])
+def test_final_refresh_reranks_late_price_change(new_price):
+    catalog, tasks = load_examples()
+    catalog = catalog.model_copy(deep=True)
+    catalog.products[1].price = 95
+    task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
+    task.expected.valid_product_ids = ["summit-shell"]
+    # Search plus five listing reads occur before the selected candidate is refreshed.
+    task.mutations = [Mutation(after_observations=6, product_id="ridge-shell", price=new_price)]
+    result = run_trial(catalog, task)
+    assert result.is_successful
+    assert result.selected_product_ids == ["summit-shell"]
+    assert result.tool_calls == 9
+    assert result.cart_items[0].product_id == "summit-shell"
+
+
+def test_late_change_can_preserve_the_same_winner():
+    catalog, tasks = load_examples()
+    task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
+    task.mutations = [Mutation(after_observations=6, product_id="ridge-shell", price=90)]
+    result = run_trial(catalog, task)
+    assert result.is_successful
+    assert result.selected_product_ids == ["ridge-shell"]
+    assert result.tool_calls == 8
+    assert result.claims[1]["value"] == 90

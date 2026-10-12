@@ -4,7 +4,9 @@ The deterministic pilot is implemented. Keep catalog/tasks, browser adapters, an
 
 ## Teammate 1: LLM agent
 
-Implement `Agent.run(AgentInput, ShoppingTools) -> AgentOutput` from `shopping_agent.interfaces`. Inputs contain the structured request and ranking rule. Outputs carry selected IDs, response text, claims, evidence, and termination reason. The runner owns scoring, task expectations, store reset, and measurements. Do not return success scores or pass an entire `TaskDefinition` to the agent.
+Implement `Agent.run(AgentInput, ShoppingTools) -> AgentOutput` from `shopping_agent.interfaces`. Inputs contain the structured request and ranking rule. Outputs carry selected IDs, response text, claims, evidence, and termination reason. The runner owns scoring, task expectations, store reset, and measurements.
+
+The current parsed request also supplies `clarification_needed`, including the exact question. The clarification pilot evaluates instruction routing, not ambiguity discovery. For comparative runs, choose and document one common input policy before testing: omit this directive when measuring model ambiguity detection, or supply identical parsed assistance to every condition and exclude discovery from the measured capability. Do not compare a raw-text model against this assisted baseline as if inputs were equivalent. Do not return success scores or pass an entire `TaskDefinition` to the agent.
 
 The four public operations are:
 

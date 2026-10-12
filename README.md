@@ -49,6 +49,12 @@ in a standalone wheel.
 
 The baseline receives supplied structured requests and ranking rules, not expected
 answers. It does not evaluate language parsing, an LLM, or browser navigation.
+The clarification task supplies `request.clarification_needed`, including the exact
+question. Its successful trials measure routing a supplied clarification instruction,
+not discovering ambiguity. Expected outcome objects are hidden, but this parsed input
+is assistance. Before LLM comparisons, either remove that directive from model inputs
+and evaluate ambiguity detection separately, or give all conditions identical parsed
+assistance and explicitly exclude ambiguity discovery from the comparison.
 Scoring uses final live store state and cart contents. Failures remain in the success
 rate denominator. Constraint satisfaction is averaged over trials expecting a product
 with at least one hard constraint; empty no-match/clarification selections are not
@@ -59,4 +65,8 @@ A forcibly stopped worker has no final-state snapshot and is always unsuccessful
 Human ratings, claim-audit rates, and model measurements remain null when unavailable.
 
 See [parallel handoff](docs/parallel-handoff.md), [Update 2 draft](docs/project-update-2.md),
-and [preserved pilot records](docs/pilot/rules-2026-10-12.jsonl).
+and [reviewed pilot records](docs/pilot/rules-2026-10-12-reviewed.jsonl).
+
+A visually checked [Update 2 PDF draft](output/pdf/project-update-2-draft.pdf) is included.
+It remains a draft until the team supplies all four names and actual contribution statements.
+The original pilot records are retained alongside the rerun after the reviewer fixes.

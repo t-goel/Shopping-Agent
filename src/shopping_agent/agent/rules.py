@@ -1,4 +1,4 @@
-"""Structured-request rules baseline; no natural-language parser or oracle access."""
+"""Structured-request rules baseline; no natural-language parser or evaluator-answer access."""
 from shopping_agent.contracts import CartSelection, SearchInput
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
@@ -41,14 +41,29 @@ class RulesAgent:
                 raise
             if eligible(latest, request.constraints):
                 current.append(latest)
-        for candidate in rank(current, inputs.ranking_rule):
-            latest = tools.get_listing(candidate.product.product_id)
+        while current:
+            candidate = rank(current, inputs.ranking_rule)[0]
+            candidate_id = candidate.product.product_id
+            try:
+                latest = tools.get_listing(candidate_id)
+            except ToolError as exc:
+                if exc.status_code != 404:
+                    raise
+                current = [item for item in current if item.product.product_id != candidate_id]
+                continue
+            current = [item for item in current if item.product.product_id != candidate_id]
             if not eligible(latest, request.constraints):
+                continue
+            current.append(latest)
+            # A price/rating change can preserve eligibility but change the winner.
+            # Update known facts and rerank before committing to the cart.
+            if rank(current, inputs.ranking_rule)[0].product.product_id != candidate_id:
                 continue
             try:
                 cart = tools.add_to_cart(CartSelection(product_id=latest.product.product_id, quantity=1))
             except ToolError as exc:
                 if exc.status_code == 409:
+                    current = [item for item in current if item.product.product_id != candidate_id]
                     continue
                 raise
             p = latest.product
