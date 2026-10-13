@@ -190,9 +190,16 @@ class TrialResult(Contract):
     duration_seconds: float = Field(ge=0)
     termination_reason: Literal[
         "completed", "no_valid_product", "clarification_needed",
-        "max_tool_calls_exceeded", "unrecoverable_failure",
+        "max_tool_calls_exceeded", "timeout", "unrecoverable_failure",
     ]
     is_successful: bool
+    difficulty: Literal["easy", "medium", "hard"] | None = None
+    expected_kind: Literal["product", "no_valid_product", "clarification"] | None = None
+    claims: list[dict] = Field(default_factory=list)
+    tool_trace: list[dict] = Field(default_factory=list)
+    final_state: dict | None = None
+    error: str | None = None
+    run_metadata: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def bounded_satisfaction(self):
