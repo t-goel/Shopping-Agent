@@ -52,12 +52,6 @@ def metadata(max_calls: int, seconds: float) -> dict:
 
 
 def select_agent(agent=None, agent_name: str = "rules"):
-    """Choose which agent instance to run and its canonical name.
-
-    An explicitly passed agent instance takes precedence; otherwise the
-    agent is constructed from ``agent_name``. Centralizes agent selection
-    so trial/suite paths stay consistent.
-    """
     if agent is not None:
         if isinstance(agent, RulesAgent):
             return agent, "rules"
