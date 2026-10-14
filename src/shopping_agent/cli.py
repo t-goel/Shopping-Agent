@@ -33,13 +33,14 @@ def main():
     run.add_argument("--seed", type=int, default=498)
     run.add_argument("--max-calls", type=positive_int, default=10)
     run.add_argument("--timeout", type=positive_seconds, default=60)
+    run.add_argument("--agent", choices=("rules", "claude"), default="rules")
     report = commands.add_parser("report")
     report.add_argument("input", type=Path)
     args = parser.parse_args()
     if args.command == "run":
         _, _, load_examples = load_store_modules()
         catalog, tasks = load_examples(args.catalog, args.tasks)
-        run_suite(catalog, tasks, args.output, args.repetitions, args.seed, args.max_calls, args.timeout)
+        run_suite(catalog, tasks, args.output, args.repetitions, args.seed, args.max_calls, args.timeout, args.agent)
         path = args.output
     else:
         path = args.input

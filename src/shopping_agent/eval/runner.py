@@ -10,6 +10,7 @@ from importlib.metadata import version
 from pathlib import Path
 from time import monotonic
 
+from shopping_agent.agent.agent import Agent as ClaudeAgent
 from shopping_agent.agent.rules import RulesAgent
 from shopping_agent.contracts import CartSelection, CatalogExample, TaskDefinition, TrialResult
 from shopping_agent.eval.scoring import score
@@ -93,6 +94,9 @@ def run_trial(
     store.reset(task.task_id)
     config = metadata(max_calls, seconds)
 
+    selected_agent = agent or RulesAgent()
+    agent_name = "rules" if agent is None else "claude"
+
     with TestClient(create_app(store)) as client:
         tools = BudgetedTools(
             CatalogAPI(client),
@@ -104,7 +108,7 @@ def run_trial(
         error = None
 
         try:
-            output = (agent or RulesAgent()).run(
+            output = selected_agent.run(
                 AgentInput(
                     request=task.request.model_copy(deep=True),
                     ranking_rule=task.ranking_rule,
@@ -132,7 +136,7 @@ def run_trial(
             task_id=task.task_id,
             task_version=task.version,
             catalog_version=task.catalog_version,
-            agent_name="rules",
+            agent_name=agent_name,
             model_id=None,
             prompt_version=None,
             trial_number=trial_number,
@@ -272,9 +276,12 @@ def run_suite(
     seed: int = 498,
     max_calls: int = 10,
     seconds: float = 60,
+    agent_name: str = "rules",
 ):
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
+    if agent_name not in {"rules", "claude"}:
+        raise ValueError("agent_name must be rules or claude")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
@@ -286,7 +293,8 @@ def run_suite(
             rng.shuffle(order)
 
             for position, task_id in enumerate(order):
-                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds)
+                agent = ClaudeAgent() if agent_name == "claude" else None
+                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds, agent)
                 result.run_metadata.update(seed=seed, task_order=order, task_position=position)
                 stream.write(result.model_dump_json() + "\n")
                 stream.flush()
