@@ -51,6 +51,24 @@ def metadata(max_calls: int, seconds: float) -> dict:
     }
 
 
+def select_agent(agent=None, agent_name: str = "rules"):
+    """Choose which agent instance to run and its canonical name.
+
+    An explicitly passed agent instance takes precedence; otherwise the
+    agent is constructed from ``agent_name``. Centralizes agent selection
+    so trial/suite paths stay consistent.
+    """
+    if agent is not None:
+        if isinstance(agent, RulesAgent):
+            return agent, "rules"
+        return agent, "claude"
+    if agent_name == "claude":
+        return ClaudeAgent(), "claude"
+    if agent_name == "rules":
+        return RulesAgent(), "rules"
+    raise ValueError("agent_name must be rules or claude")
+
+
 def failure_record(task, trial_number, reason, duration, trace, error, config) -> TrialResult:
     return TrialResult(
         task_id=task.task_id,
@@ -94,8 +112,7 @@ def run_trial(
     store.reset(task.task_id)
     config = metadata(max_calls, seconds)
 
-    selected_agent = agent or RulesAgent()
-    agent_name = "rules" if agent is None else "claude"
+    selected_agent, agent_name = select_agent(agent)
 
     with TestClient(create_app(store)) as client:
         tools = BudgetedTools(
@@ -280,8 +297,6 @@ def run_suite(
 ):
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
-    if agent_name not in {"rules", "claude"}:
-        raise ValueError("agent_name must be rules or claude")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
@@ -293,7 +308,7 @@ def run_suite(
             rng.shuffle(order)
 
             for position, task_id in enumerate(order):
-                agent = ClaudeAgent() if agent_name == "claude" else None
+                agent, _ = select_agent(agent_name=agent_name)
                 result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds, agent)
                 result.run_metadata.update(seed=seed, task_order=order, task_position=position)
                 stream.write(result.model_dump_json() + "\n")
