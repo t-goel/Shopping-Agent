@@ -10,6 +10,7 @@ from importlib.metadata import version
 from pathlib import Path
 from time import monotonic
 
+from shopping_agent.agent.agent import Agent as ClaudeAgent
 from shopping_agent.agent.rules import RulesAgent
 from shopping_agent.contracts import CartSelection, CatalogExample, TaskDefinition, TrialResult
 from shopping_agent.eval.scoring import score
@@ -48,6 +49,18 @@ def metadata(max_calls: int, seconds: float) -> dict:
         "packages": {name: version(name) for name in ("fastapi", "pydantic", "httpx")},
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def select_agent(agent=None, agent_name: str = "rules"):
+    if agent is not None:
+        if isinstance(agent, RulesAgent):
+            return agent, "rules"
+        return agent, "claude"
+    if agent_name == "claude":
+        return ClaudeAgent(), "claude"
+    if agent_name == "rules":
+        return RulesAgent(), "rules"
+    raise ValueError("agent_name must be rules or claude")
 
 
 def failure_record(task, trial_number, reason, duration, trace, error, config) -> TrialResult:
@@ -93,6 +106,8 @@ def run_trial(
     store.reset(task.task_id)
     config = metadata(max_calls, seconds)
 
+    selected_agent, agent_name = select_agent(agent)
+
     with TestClient(create_app(store)) as client:
         tools = BudgetedTools(
             CatalogAPI(client),
@@ -104,7 +119,7 @@ def run_trial(
         error = None
 
         try:
-            output = (agent or RulesAgent()).run(
+            output = selected_agent.run(
                 AgentInput(
                     request=task.request.model_copy(deep=True),
                     ranking_rule=task.ranking_rule,
@@ -132,7 +147,7 @@ def run_trial(
             task_id=task.task_id,
             task_version=task.version,
             catalog_version=task.catalog_version,
-            agent_name="rules",
+            agent_name=agent_name,
             model_id=None,
             prompt_version=None,
             trial_number=trial_number,
@@ -272,6 +287,7 @@ def run_suite(
     seed: int = 498,
     max_calls: int = 10,
     seconds: float = 60,
+    agent_name: str = "rules",
 ):
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
@@ -286,7 +302,8 @@ def run_suite(
             rng.shuffle(order)
 
             for position, task_id in enumerate(order):
-                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds)
+                agent, _ = select_agent(agent_name=agent_name)
+                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds, agent)
                 result.run_metadata.update(seed=seed, task_order=order, task_position=position)
                 stream.write(result.model_dump_json() + "\n")
                 stream.flush()
