@@ -9,102 +9,116 @@
 \usepackage{booktabs}
 \usepackage{tabularx}
 
-\title{Diagnosing Reliable Product Selection in Shopping Agents}
+\title{Benchmark Paper Title}
 
-\author{Anonymous Authors \\
-Affiliation \\
-\texttt{email}
-}
+\author{Neel Kumar \\ \texttt{neelvk2@illinois.edu} \and Ronit Rout \\ \texttt{ronitr2@illinois.edu} \and Tanmay Goel \\ \texttt{timgoel2@illinois.edu}}
+
+
 
 \newcommand{\fix}{\marginpar{FIX}}
 \newcommand{\new}{\marginpar{NEW}}
 
-%\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions rather than catalog scale or general web navigation. Agents shop in a resettable mock storefront whose public listings can conflict with structured ground-truth attributes. The scored suite is \textbf{Surface~B}: thirty natural-language tasks (10 easy / 10 medium / 10 hard) on a 20-product catalog, with typed constraints, ranking rules, mutations, and expected outcomes withheld by the evaluator. Tasks probe hard-constraint satisfaction, decoy resistance, clarification and abstention, soft-versus-hard preference conflicts, scenario implication, and recovery or abstention after mid-trial price or stock mutations. A separate \textbf{Surface~A} harness of five structured-input fixtures validates reset, mutation, and live-state scoring; a rules baseline scoring 15/15 there confirms plumbing, not shopping competence. Evaluating model and browser agents on Surface~B under the same protocol is next.
+We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions rather than catalog scale or general web navigation. Agents operate in a resettable mock storefront whose public listings can conflict with structured ground-truth specifications. The scored suite is \textbf{Surface~B}: thirty natural-language tasks (10 easy / 10 medium / 10 hard) on a 20-product catalog, with typed constraints, ranking rules, mutations, and expected outcomes withheld by the evaluator. Tasks score hard-constraint satisfaction, decoy resistance, clarification and abstention, soft-versus-hard preference conflicts, scenario implication, and recovery or abstention after mid-trial price or stock mutations. A separate \textbf{Surface~A} harness of five structured-input fixtures validates reset, mutation, and live-state scoring; a rules baseline scoring 15/15 there confirms plumbing, not shopping competence. Evaluating model and browser agents on Surface~B under the same protocol is next.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:intro}
 
-Autonomous agents are increasingly asked to shop on behalf of users: search a catalog, compare options, and commit to a purchase under natural-language constraints. In practice this is harder than retrieving a top-$k$ list of similar products. Marketing copy can overclaim capabilities, sponsored placements can dominate result order, near-miss items can fail a single hard requirement while matching everything else, and inventory can change after an agent has already formed a plan. An agent that looks successful by final-page completion may still have silently relaxed a budget, trusted a keyword-stuffed title, or checked out on a stale price.
 
-Existing shopping and web-agent benchmarks emphasize either large catalogs and end-to-end purchase success or broad multi-site navigation \cite{yao2022webshop,zhou2024webarena,wang2026shoppingbench,peeters2026webmall}. Those goals matter, but they leave several failure modes under-instrumented: whether every hard constraint was satisfied against authoritative product state, whether the agent abstained when nothing qualified, whether soft preferences overrode hard requirements, whether justifications were grounded in observed specifications rather than promotional text, and whether the agent recovered when price or stock mutated mid-trial.
+Shopping agents must do more than retrieve relevant products: they must verify that selected items satisfy user constraints, support their factual claims with reliable evidence, and adapt when prices or availability change. Product listings may contain persuasive or ambiguous marketing language, while products that initially satisfy a request can become invalid during execution. These conditions make online shopping a problem of verification and state tracking as well as search and recommendation.
 
-We introduce a diagnostic shopping-agent benchmark built around reliable product selection under controlled failure conditions. Agents operate in a resettable mock storefront whose public listing text can conflict with structured ground-truth attributes. Tasks are versioned JSON definitions pinned to a catalog version. Expected outcomes are evaluator-held and take one of three forms---select a specific valid SKU under a declared ranking rule, terminate with \texttt{no\_valid\_product}, or ask for clarification.
+Existing benchmarks such as WebShop and WebArena evaluate important capabilities including product search, web navigation, and long-horizon task completion. However, they are not primarily designed to isolate failures in factual product grounding, hard-constraint verification, or adaptation to controlled changes in shopping state. Our benchmark targets these failure modes directly in a reproducible simulated retail environment.
 
-A central design choice is the split between agent surfaces. On \textbf{Surface~B} (the scored benchmark), the agent receives only the natural-language request plus allowlisted store tools. Typed constraints, ranking rules, planted clarification directives, mutations, and expected outcomes stay evaluator-held. On \textbf{Surface~A} (harness only), structured constraints and ranking rules are supplied so a deterministic rules baseline can validate reset, mutation, and live-state scoring. Surface~A rules success of 15/15 therefore measures harness fidelity, not shopping ability: the answer key was in the input. Reporting Surface~A percentages as shopping competence would be a measurement error.
+Our first contribution is a controlled distinction between public-facing product information and structured ground-truth specifications. Listings may contain misleading or incomplete marketing text, while evaluation relies on authoritative product attributes. This allows the benchmark to separately measure whether an agent selects a valid product and whether its factual claims are supported by observed evidence.
 
-Our contributions are: (1)~a thirty-task Surface~B suite and \texttt{catalog-v2} design that separately probe constraint satisfaction, decoy resistance, clarification/abstention, soft-versus-hard conflicts, implication, and mutation recovery or abstention; (2)~an evaluation protocol that scores live final store state rather than agent-reported success, with per-constraint and claim-audit metrics alongside task success; and (3)~a Surface~A rules-baseline pilot confirming that reset, mutation, and live-state scoring work end-to-end. Evaluating model and browser agents on Surface~B under the same protocol is next.
+Our second contribution is explicit evaluation under changing environment state. Tasks can introduce price increases, stock changes, near-match products, or cases where no valid item exists. Agents must re-evaluate earlier decisions rather than rely on stale observations, and success is determined from the final live store state.
 
+Together, these design choices provide a benchmark for diagnosing shopping-agent reliability beyond final task completion. By fixing task definitions, catalog versions, state mutations, and expected outcomes independently of any agent implementation, the benchmark supports reproducible comparison of factual grounding, constraint satisfaction, and adaptation to dynamic conditions.
+
+% Tim doing this rn
 \section{Related Work}
 \label{sec:related_work}
 
 Several benchmarks have evaluated language agents in online shopping and broader web environments. \textbf{WebShop} \cite{yao2022webshop} introduced a simulated e-commerce environment containing 1.18 million real-world products and 12,087 crowd-sourced shopping instructions. Agents must search for products, inspect pages, select product options, and complete purchases from natural-language requests. WebShop primarily evaluates navigation, query reformulation, product matching, and strategic exploration in a large but mostly static shopping environment.
 
-\textbf{WebArena} \cite{zhou2024webarena} extends agent evaluation to realistic, reproducible websites spanning several domains, including e-commerce. Its benchmark emphasizes long-horizon web interaction and functional task completion. Shopping is only one of several domains and is not specifically designed to isolate product-selection reliability or factual grounding.
+\textbf{WebArena} \cite{zhou2024webarena} extends agent evaluation to realistic, reproducible websites spanning several domains, including e-commerce. Its benchmark emphasizes long-horizon web interaction and functional task completion, such as navigating interfaces and modifying website state. However, shopping is only one of several domains and the benchmark is not specifically designed to isolate product-selection reliability or factual grounding.
 
-More recent benchmarks focus on complex shopping behavior. \textbf{ShoppingBench} \cite{wang2026shoppingbench} provides a large-scale shopping sandbox with more than 2.5 million real-world products and evaluates complex intents including budget management, voucher use, and multi-product purchases. \textbf{WebMall} \cite{peeters2026webmall} evaluates comparison-shopping across four simulated stores and introduces tasks involving price comparisons, substitutes, compatible products, cart manipulation, and checkout.
+More recent benchmarks focus directly on increasingly complex shopping behavior. \textbf{ShoppingBench} \cite{wang2026shoppingbench} provides a large-scale shopping sandbox with more than 2.5 million real-world products and evaluates complex intents including budget management, voucher use, and multi-product purchases. \textbf{WebMall} \cite{peeters2026webmall} evaluates comparison-shopping across four simulated stores and introduces tasks involving price comparisons, substitutes, compatible products, cart manipulation, and checkout.
 
-Our benchmark is complementary. Rather than emphasizing catalog scale or general web-navigation ability, we diagnose reliable product selection under controlled failure conditions: near-match decoys, empty valid sets, mid-trial price and stock mutations, soft preferences that must not override hard constraints, and underspecification that requires clarification. Structured ground-truth attributes let us score constraint satisfaction and claim grounding separately from final-page completion.
+Our benchmark is complementary to these efforts. Rather than emphasizing catalog scale or general web-navigation ability, we focus on diagnosing reliable product selection under controlled failure conditions. Tasks explicitly include near-match products, unavailable products, mid-execution price changes, and cases where no item satisfies all user constraints. Because the environment contains structured ground-truth product specifications, we can separately evaluate constraint satisfaction, factual grounding, and adaptation to state changes rather than relying only on final task completion.
+
 
 \section{Benchmark Design}
 \label{sec:benchmark_design}
 
-\subsection{Task Domain and Scope}
+\subsection{Task Domain and Scope} % Working on this rn - Ronit
+Our benchmark is focused on testing the capabilities of autonomous shopping agents in a simulated online retail environment modeling a realistic one: this includes incomplete information, misleading marketing claims and inventory changes during execution. Rather than treating shopping as a recommendation problem or top-$k$ semantic retrieval problem, we frame it as an execution task, where an agent is given user requirements, and must navigate a catalog, verify item details and generate the best possible list of items.
 
-The domain is single-merchant comparison shopping over a closed, version-pinned catalog (\texttt{catalog-v2}: 20 products across jackets, bags, and footwear). Agents must navigate search and product detail surfaces, verify structured attributes rather than marketing text, and terminate with a cart selection, an empty-set abstention, or a clarification question. Public listing metadata (titles, promotional descriptions, sponsored flags, reviews) may conflict with structured ground-truth specifications (waterproof, size, capacity, price, stock). Attributes are authoritative for scoring.
+ To evaluate whether agents rely on superficial text matching versus verified details, every product listing data that the agent processes can be divided into the two categories:
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \textbf{Public Listing Metadata:} Customer-facing text including product titles, promotional points included in description and user reviews. This data may contain misleading information (e.g., labeling a $1080\text{p}$ projector as ``4K Compatible'' in the description).
+    \item \textbf{Structured Ground-Truth Specifications:} The underlying authoritative database schema containing verified physical dimensions, hardware interface protocols, certified allergen/dietary standards, unit pricing, and real-time inventory levels.
 
-In scope: hard-constraint conjunctions, declared ranking among valid candidates, decoy resistance, clarification, abstention, soft-versus-hard preference conflicts, scenario implication, and mid-trial price/stock mutations. Out of scope: multi-shop checkout, live web navigation, multi-turn dialogs, and subjective ``best'' without a declared ranking rule. We do not follow an existing shopping-benchmark framework end-to-end; we reuse the common pattern of a resettable simulated store with programmatic final-state checks \cite{yao2022webshop,zhou2024webarena}, but the task semantics, decoy taxonomy, Surface~B withholding, and mutation scoring are original to this suite.
+\end{itemize}
+
+This aspect of the benchmarks makes sure that shopping agents do not get misled and recommend products on the basis of marketed claims instead of verifying ground truth for specifications. 
+
+The benchmark mainly tests for four behaviors: 
+\begin{enumerate}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \textbf{Constraint Satisfaction:} Parsing user queries with nested requirements (e.g., price ceilings, dimensional limits or any other required specifications) and identifying SKUs whose verified specifications satisfy all hard constraints simultaneously.
+    \item \textbf{Factual Grounding and Claim Verification:} Inspecting technical specification tables rather than relying on promotional terms and marketing lingo, penalizing agents that hallucinate capabilities based on keyword overlap.
+    \item \textbf{Unachievable Goal Detection:} Recognizing when no item in the catalog satisfies a user's strict conjunction of constraints, requiring the agent to terminate with an explicit empty-set notification rather than purchasing a non-compliant item.
+    \item \textbf{Mid-Trajectory State Adaptation:} Intercepting runtime environment mutations, including out-of-stock items at or before checkout, or dynamic price shifts, and executing recovery routines to find compliant alternatives without exceeding step or token budgets.
+\end{enumerate}
+
+Some actions that would be in the scope of this benchmark would be catalog search queries, product detail page navigation, retrieving the specification table for any given product. Out of scope is live financial transactions and passing any CAPTCHAs since our focus in this benchmark is the decisions that agents make to choose the best products according to the query. All benchmark tasks are based on single, complete and fixed prompts (rather than multi-turn or variable requests).
 
 \subsection{Two Agent Surfaces}
 
-\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
-    \item \textbf{Surface~A (harness / oracle).} The agent receives structured constraints and a ranking rule. Purpose: prove reset, mutations, tool budgets, and live-state scoring. Five fixtures under \texttt{data/tasks/harness/}. Never reported as shopping competence.
-    \item \textbf{Surface~B (benchmark).} The agent receives natural-language text only plus allowlisted store tools. Typed constraints, ranking rules, mutations, and expected outcomes are evaluator-held. Thirty tasks under \texttt{data/tasks/*.json} (\texttt{suite-v3}). Primary tables and all model/browser comparisons use Surface~B.
-\end{itemize}
+A central design choice after expanding the suite is the split between agent surfaces. On \textbf{Surface~B} (the scored benchmark), the agent receives only the natural-language request plus allowlisted store tools. Typed constraints, ranking rules, planted clarification directives, mutations, and expected outcomes stay evaluator-held. On \textbf{Surface~A} (harness only), structured constraints and ranking rules are supplied so a deterministic rules baseline can validate reset, mutation, and live-state scoring. Surface~A rules success of 15/15 therefore measures harness fidelity, not shopping ability: the answer key was in the input. Reporting Surface~A percentages as shopping competence would be a measurement error.
 
 \subsection{Task Descriptions}
 
 Each task is a versioned JSON definition pinned to a catalog version. Evaluator-held fields specify: (i)~hard constraints as typed attribute/operator/value triples, optionally with soft preferences; (ii)~a ranking rule among valid candidates (\texttt{lowest\_price}, \texttt{highest\_rating}, \texttt{highest\_rating\_then\_reviews}, or \texttt{none}); (iii)~an expected outcome; and (iv)~optional scheduled mutations that fire after a fixed number of agent observations. Expected outcomes are withheld from the Surface~B agent and take one of three kinds:
 
 \begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
-    \item \textbf{Product selection:} select and cart exactly one SKU from the expected valid set under the declared ranking rule, with live price and stock matching final store state.
+    \item \textbf{Product selection:} select and add to cart exactly one SKU from the expected valid set under the declared ranking rule, with live price and stock matching final store state.
     \item \textbf{No valid product:} terminate with \texttt{no\_valid\_product}, leave the cart empty, and correctly conclude that no in-stock SKU satisfies every hard constraint (after applying any mutations).
-    \item \textbf{Clarification:} terminate with \texttt{clarification\_needed}, ask a question that covers a required underspecified attribute (e.g., size or capacity), and do not select or cart any product.
+    \item \textbf{Clarification:} terminate with \texttt{clarification\_needed}, ask a question that covers a required underspecified attribute (e.g., size), and do not select or cart any product.
 \end{itemize}
 
-Surface~B comprises thirty tasks (10 easy / 10 medium / 10 hard). Easy tasks state constraints and a ranking cue explicitly while catalog decoys (sponsored first hits, keyword-stuffed non-waterproof titles, rain-cover near-misses) still punish title-trust. Medium tasks cover clarification under temptation to guess, empty-set abstention under attractive decoys, and soft preference language that pulls toward non-waterproof near-misses. Hard tasks schedule mid-trial price hikes, stockouts, or restocks without telegraphing re-check behavior in the prompt, or require mapping a scenario to attributes (implication) without an attribute dump. Full IDs and winners appear in the companion suite document; three representatives:
+Surface~B (\texttt{suite-v3}) comprises thirty tasks on \texttt{catalog-v2} (20 products across jackets, bags, and footwear), stratified 10 easy / 10 medium / 10 hard. Easy tasks state constraints and a ranking cue explicitly while catalog decoys still punish title-trust. Medium tasks cover clarification under temptation to guess, empty-set abstention under attractive decoys, and soft preference language that pulls toward non-waterproof near-misses. Hard tasks schedule mid-trial price hikes, stockouts, or restocks without telegraphing re-check behavior in the prompt, or require mapping a scenario to attributes (implication). Full IDs and winners ship with the release; three representatives:
 
-\paragraph{Easy product (\texttt{nl\_cheapest\_waterproof\_jacket\_m}).}
-NL: ``I need the cheapest waterproof jacket that fits medium, and I won't go over a hundred dollars.'' Evaluator constraints require jackets, waterproof, size~M, price~$\le$~\$100; ranking \texttt{lowest\_price}; expected \texttt{ridge-shell}. Challenge: sponsored and reseller keyword decoys look waterproof in titles but fail \texttt{attributes.waterproof}.
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \texttt{nl\_cheapest\_waterproof\_jacket\_m} (easy, product): cheapest waterproof size-M jacket under \$100; winner \texttt{ridge-shell}; sponsored and reseller keyword decoys look waterproof in titles.
+    \item \texttt{prefer\_comfort\_but\_require\_waterproof\_pack} (medium, product): $\sim$30\,L waterproof pack under \$100 with comfort language; winner \texttt{basalt-carryall}; comfort/ratings pull toward rain-cover \texttt{canyon-pack}.
+    \item \texttt{price\_hike\_recover\_to\_alternative} (hard, product): cheapest in-stock waterproof medium jacket at or under \$120; after one observation \texttt{ridge-shell} rises to \$130; expected recovery to \texttt{summit-shell}.
+\end{itemize}
 
-\paragraph{Medium soft-vs-hard (\texttt{prefer\_comfort\_but\_require\_waterproof\_pack}).}
-NL asks for a $\sim$30\,L hiking pack under \$100 that is waterproof for multi-day rain, while stressing comfort reviews. Expected \texttt{basalt-carryall}. Challenge: comfort language and ratings pull toward rain-cover \texttt{canyon-pack} (\texttt{waterproof: false}); the NL does not name the trap SKU or the rejection rule.
-
-\paragraph{Hard mutation recovery (\texttt{price\_hike\_recover\_to\_alternative}).}
-NL: ``Cheapest in-stock waterproof medium jacket at or under \$120.'' After one observation, \texttt{ridge-shell} price rises to \$130. Expected recovery to \texttt{summit-shell}. Challenge: the prompt does not say to re-check price; agents that cart from a stale first look fail.
+Surface~A keeps five structured-input harness fixtures under \texttt{data/tasks/harness/} (the original pilot tasks: cheapest jacket, clarify size, empty set under \$50, price change, stock change) for plumbing smoke tests only.
 
 \subsection{Task Design Principles}
 
+Task authoring follows a small set of rules that keep outcomes deterministically evaluatable and failure modes interpretable:
+
 \begin{enumerate}[leftmargin=*,noitemsep,topsep=0pt]
-    \item \textbf{Ground truth is unauditable from titles.} Titles and descriptions may hedge or keyword-stuff; structured attributes are authoritative.
-    \item \textbf{Near-misses fail exactly one hard constraint.} Otherwise-perfect products miss only category, waterproof, size, capacity, price, or availability.
-    \item \textbf{Decoys are typed.} Sponsored first-slot items, keyword-stuffed non-waterproof titles, water-resistant siblings, over-budget near-misses, out-of-stock high-rated items, and reseller copies are seeded so failures are attributable.
-    \item \textbf{Hard constraints never yield to preferences.} Soft preference text cannot override a failed hard constraint; ranking applies only within the valid set.
-    \item \textbf{Mutations target formerly winning SKUs} without NL telegraphs (``double-check price'', ``confirm stock'').
+    \item \textbf{Ground truth is unauditable from titles.} Titles and descriptions can be keyword-stuffed; extracted attributes are authoritative. 
+    \item \textbf{Near-misses fail exactly one hard constraint.} For each scored axis (category, waterproof, size, capacity, price, availability) the catalog must include products that miss only that constraint, exposing any gaps.
+    \item \textbf{Decoys are typed, not incidental noise.} Sponsored first-slot items, keyword-stuffed non-waterproof titles, water-resistant siblings of waterproof products, over-budget near-misses, out-of-stock high-rated items, and reseller copies are seeded so robustness can be attributed to a failure class.
+    \item \textbf{Hard constraints never yield to preferences.} Soft preference text (comfort, reviews, brand) must not override a failed hard constraint; ranking rules apply only within the valid set.
+    \item \textbf{Mutations target formerly winning SKUs.} Price and stock mutations fire mid-trial against products that would otherwise win, forcing re-verification rather than reuse of stale observations. Surface~B prompts do not telegraph re-check behavior.
     \item \textbf{Surface~B never plants the answer key.} Constraints, ranking rules, and \texttt{clarification\_needed} directives are absent from agent-facing input.
-    \item \textbf{Expected sets are hand-authored and loader-checked.} The loader re-derives each non-clarification valid set from catalog state plus mutations and rejects mismatches.
-    \item \textbf{Version pinning.} Every task declares \texttt{catalog\_version}; ground-truth edits require a new catalog version and re-validation.
 \end{enumerate}
 
 \subsection{Difficulty Distribution}
 
-Difficulty labels follow the dominant failure mode, not catalog size (Table~\ref{tab:difficulty}):
+Difficulty labels are assigned by the dominant failure mode rather than by catalog size (Table~\ref{tab:difficulty}):
 
 \begin{table}[t]
 \centering
@@ -123,53 +137,71 @@ Hard & 10 & Mutations / implication & Mutation telegraphs (``re-check'', ``confi
 
 Aggregate reports always stratify by difficulty so easy wins cannot mask hard failures.
 
+% 
 \section{Evaluation Protocol}
 \label{sec:eval_protocol}
 
 \subsection{Metrics}
 
-We report complementary metrics rather than a single scalar:
+We report a sequence of metrics rather than a single value:
 
 \begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
-    \item \textbf{Task success rate:} fraction of trials whose termination reason, selection, and final cart state match the expected outcome under live store state.
-    \item \textbf{Hard-constraint satisfaction:} for product-outcome trials, the fraction of hard constraints satisfied by selected SKUs against the final snapshot; abstention and clarification trials are excluded.
-    \item \textbf{Unsupported-claim rate:} fraction of agent-stated product facts marked \texttt{contradicts} or \texttt{unknown} by the observation-backed claim verifier. Null when claim audits are disabled.
+    \item \textbf{Task success rate (TSR):} fraction of trials whose termination reason, selection, and final cart state match the expected outcome
+
+    \begin{equation}
+    \text{TSR} = \frac{1}{N} \sum_{i=1}^N \mathbb{I}(\text{Trial}_i \text{ is valid and matches expected outcome}).
+    \end{equation}
+    
+    
+    \item \textbf{Hard-constraint satisfaction:} for product-outcome trials, the fraction of hard constraints satisfied by selected SKUs against the final snapshot; trials where the expected outcome is \texttt{no\_valid\_product} or \texttt{clarification\_needed} are excluded from this average.
+    \item \textbf{Unsupported-claim rate:} fraction of agent-stated product facts marked \texttt{contradicts} or \texttt{unknown} by the observation-backed claim verifier (supports / contradicts / unknown).
     \item \textbf{Efficiency:} median and nearest-rank p95 wall-clock duration, median public tool calls, and (for model agents) token usage and estimated USD cost.
-    \item \textbf{Termination mix:} counts of \texttt{completed}, \texttt{no\_valid\_product}, \texttt{clarification\_needed}, \texttt{timeout}, \texttt{max\_tool\_calls\_exceeded}, and \texttt{unrecoverable\_failure}.
+    \item \textbf{Termination mix:} Counts of exits / failure modes: completed, timeout,\\ \texttt{no\_valid\_product}, \texttt{clarification\_needed}, \texttt{max\_tool\_calls\_exceeded}, and \texttt{unrecoverable\_failure}.
 \end{itemize}
 
-Budget violations and crashes count as unsuccessful and remain in the success-rate denominator.
+Budget violations and crashes count as unsuccessful and remain in the success-rate denominator. Human preference ratings, when collected, use a fixed anchored rubric and are reported separately from objective success.
 
 \subsection{Scoring}
 
-Scoring is evaluator-owned and uses the final live store snapshot; it never trusts agent-reported success. Before each trial the harness resets catalog state, installs the task's scheduled mutations, and withholds expected outcomes from the agent.
+Scoring uses the final store state. Before each trial, the harness resets catalog state, installs the task's scheduled mutations, and withholds expected outcomes from the agent. Public tools can only see storefront/API surfaces; internal reset and state are harness controls.
 
+Outcome checks:
 \begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
     \item \textbf{Clarification:} termination is \texttt{clarification\_needed}, no selection, empty cart, and the response contains the required attribute cue (e.g., ``size'').
     \item \textbf{No valid product:} termination is \texttt{no\_valid\_product}, the live candidate set after mutations is empty, and the cart/selection remain empty.
     \item \textbf{Product:} termination is \texttt{completed}, exactly one selected ID lies in the intersection of the live ranked valid set and the task's expected IDs, the cart contains that SKU at quantity~1 with matching live unit price and stock, and cart total equals that price.
 \end{itemize}
 
-Ranking retains minimum-price or maximum-rating candidates as declared; soft preferences may appear in free-text explanations but cannot salvage a hard-constraint failure. Default budgets are 20 attempted public tool calls and 60 seconds of agent execution. Timeouts and call-limit exits are unsuccessful.
+For ranking, \texttt{lowest\_price} retains minimum-price candidates and \texttt{highest\_rating} retains maximum average-rating candidates (products without reviews rank worst); \texttt{highest\_rating\_then\_reviews} breaks rating ties by review count then product id. Soft preferences may appear in free-text explanations but matching them cannot save a failure to match a hard constraint. Claim verification links each structured claim to an observation and labels it supports, contradicts, or unknown; absent fields are unknown, never treated as negative proof.
 
-\subsection{Aggregation and Reporting}
+Default budgets are 20 attempted public tool calls and 60 seconds of agent execution. Timeouts and call-limit exits are unsuccessful.
 
-Each configuration produces one JSONL record per trial (task/catalog versions, agent, mode \texttt{api} or \texttt{browser}, seed/order, tool traces, evidence, constraints satisfied, duration, success). Aggregation reports overall and per-difficulty success, product-only constraint satisfaction, termination histograms, and efficiency percentiles. API and browser conditions share task definitions but are never pooled as interchangeable interfaces. A run command writes canonical JSONL; a report command emits summary tables and a local HTML results page. Reproduction metadata is retained with every record; credentials are never logged.
+\subsection{Aggregation}
+
+Each configuration produces one JSONL record per trial, including task/catalog versions, agent name, mode (\texttt{api} or \texttt{browser}), seed/order metadata, tool traces, evidence, constraints satisfied, duration, and success. Aggregation reports overall and per-difficulty success rate, product-only constraint satisfaction, termination histograms, and efficiency percentiles. API and browser conditions share task definitions but are never pooled as interchangeable tool interfaces; comparisons are within condition.
+
+\subsection{Reporting}
+
+A run command writes canonical JSONL; a report command emits summary tables and a local HTML results page with filters for task, baseline, and mode. Reviewers can open a trial to inspect the final answer, evidence, tool-call trace, termination reason, and final cart state. Reproduction metadata (catalog version, task version, source hash, seed, limits) is retained with every record. Model identifiers and prompt versions are logged when applicable; credentials are never logged.
 
 \section{Benchmark Validation}
 \label{sec:benchmark_validation}
 
 \subsection{Pilot Testing (Surface~A harness)}
 
-We validated evaluation plumbing with a deterministic rules baseline that receives structured constraints and ranking rules---i.e., Surface~A, not Surface~B. On the five harness fixtures, three repeats each with a fixed seed yielded \textbf{15/15} successful trials (Table~\ref{tab:pilot}). Median public tool calls were~6; median in-process API duration was on the order of $10^{-2}$~seconds. These results confirm that reset, mutation, scoring, and abstention paths function end-to-end. They do \emph{not} estimate shopping ability: the constraints and ranking rule were supplied in the request. Clarification success here measures instruction routing when the clarification directive is structured; unassisted ambiguity detection is a Surface~B property.
+We validated the evaluation plumbing with a deterministic rules baseline that receives structured constraints and ranking rules---i.e., Surface~A, not Surface~B. On the five harness fixtures, three repeats each with a fixed seed yielded \textbf{15/15} successful trials (Table~\ref{tab:pilot}). Median public tool calls were~6; median in-process API duration was on the order of $10^{-2}$~seconds (not an LLM or browser latency measurement). Per-task outcomes matched expectations: product completion on the easy task, clarification routing on the size-underspecified task, and \texttt{no\_valid\_product} on the empty-set and both mutation tasks. These results confirm that reset, mutation, scoring, and abstention paths function end-to-end. They do \emph{not} estimate shopping ability: the constraints and ranking rule were supplied in the request. Clarification success here measures instruction routing when the clarification directive is structured; unassisted ambiguity detection is a Surface~B property.
 
 \subsection{Task Quality (Surface~B)}
 
-Surface~B authoring gates are automated plus manual. The loader rejects unknown attributes, clarification/outcome disagreements, and expected valid sets that disagree with catalog-plus-mutation derivation. Manual review checks that each decoy has a named failure mode, that mutations target interesting winners without NL telegraphs, and that soft preferences cannot outvote hard constraints. All thirty \texttt{suite-v3} tasks pass loader re-derivation against \texttt{catalog-v2}. Expected outcomes remain hand-authored, never distilled from agent success. Model and browser runs on Surface~B are deferred; this draft reports harness validation and suite authorship.
+Task quality gates are automated plus manual. The loader rejects unknown attributes, clarification/outcome disagreements, and expected valid sets that disagree with catalog-plus-mutation derivation. Manual review checks that each decoy has a named failure mode, that mutations target interesting winners without NL telegraphs, and that soft preferences cannot outvote hard constraints. All thirty \texttt{suite-v3} tasks pass loader re-derivation against \texttt{catalog-v2}. Expected outcomes remain hand-authored, never distilled from agent success. Model and browser runs on Surface~B are deferred; this draft reports harness validation and suite authorship.
 
 \subsection{Inter-Rater Reliability}
 
-Objective outcome scoring is deterministic and does not require raters. Human review applies to natural-language request clarity, whether clarification cues are necessary, and claim-audit labeling when free-text justifications paraphrase beyond the structured claim schema. For those items we use dual independent annotation with a third-annotator tie-break and report percent agreement and Cohen's~$\kappa$ on a pre-registered sample once comparative model runs begin. IRR is not claimed for the rules-baseline pilot because claim audits and human ratings were not measured.
+Objective outcome scoring is deterministic and does not require raters. Human review applies to (i)~natural-language request clarity, (ii)~whether clarification cues are necessary and unambiguous, and (iii)~claim-audit labeling when free-text justifications are paraphrased beyond the structured claim schema. For those items we use dual independent annotation with a third-annotator tie-break, report percent agreement and Cohen's~$\kappa$ on a pre-registered sample, and freeze the rubric before comparative model runs. IRR is not claimed for the rules-baseline pilot because claim audits and human ratings were not yet measured.
+
+\subsection{Preliminary Results}
+
+Table~\ref{tab:pilot} summarizes the Surface~A rules-baseline harness pilot. These results confirm that reset, mutation, scoring, and abstention paths function end-to-end; they do \emph{not} estimate general shopping ability or model gaps. Unsupported-claim rate and human ratings remain unmeasured for this baseline.
 
 \begin{table}[t]
 \centering
@@ -197,6 +229,8 @@ We present a shopping-agent benchmark that diagnoses reliable product selection 
 
 \subsubsection*{Acknowledgments}
 
+% Note: If iclr2026_conference.bib is not yet populated, 
+% you can comment out the bibliography lines below to compile without errors.
 \bibliography{iclr2026_conference}
 \bibliographystyle{iclr2026_conference}
 
@@ -205,7 +239,7 @@ We present a shopping-agent benchmark that diagnoses reliable product selection 
 \label{sec:appendix}
 
 \subsection{Surface~B Coverage Axes}
-\label{app:axes}
+\label{app:tasks}
 
 Representative Surface~B tasks by claimed dimension (full table in the release suite document): constraint satisfaction and ranking (\texttt{nl\_cheapest\_waterproof\_*}, \texttt{nl\_highest\_rated\_*}); soft-versus-hard (\texttt{prefer\_comfort\_*}, \texttt{prefer\_rating\_but\_require\_waterproof\_bag}); clarification (\texttt{clarify\_footwear\_size}, \texttt{clarify\_jacket\_size\_nl}, \texttt{clarify\_bag\_capacity}); abstention (\texttt{no\_waterproof\_*}); mutation recovery (\texttt{price\_hike\_*}, \texttt{stockout\_recover\_*}, \texttt{restock\_recover\_to\_cinder}); mutation abstention (\texttt{mutation\_then\_empty}, \texttt{stockout\_then\_empty\_*}, \texttt{comfort\_pack\_stockout\_abstain}); implication (\texttt{implied\_monsoon\_kit\_single\_sku}, \texttt{implied\_bike\_messenger\_waterproof}).
 
