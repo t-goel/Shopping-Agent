@@ -1,0 +1,17 @@
+{
+  "task_id": "top_rated_waterproof_bag",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "Among waterproof bags with at least 20 liters of capacity, find the one with the highest average review rating. Treat a bag with no reviews as having the worst possible rating.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "bags"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "capacity_liters", "operator": "gte", "value": 20}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "highest_rating",
+  "expected": {"kind": "product", "valid_product_ids": ["headwater-duffel"]}
+}

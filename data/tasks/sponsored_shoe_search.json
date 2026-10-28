@@ -1,0 +1,17 @@
+{
+  "task_id": "sponsored_shoe_search",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "Find the cheapest waterproof hiking shoe in US size 9 that is actually in stock.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "footwear"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "size", "operator": "eq", "value": "9"}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["tarn-fell"]}
+}

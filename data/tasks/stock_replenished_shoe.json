@@ -1,0 +1,19 @@
+{
+  "task_id": "stock_replenished_shoe",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "request": {
+    "original_text": "Find a waterproof hiking shoe in US size 9 for under $75 that is actually in stock. Stock levels change without warning, so double-check availability before you conclude there is nothing.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "footwear"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "size", "operator": "eq", "value": "9"},
+      {"attribute": "price", "operator": "lte", "value": 75}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["cinder-hiker"]},
+  "mutations": [{"after_observations": 1, "product_id": "cinder-hiker", "stock": 3}]
+}

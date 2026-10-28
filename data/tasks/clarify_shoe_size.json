@@ -1,0 +1,17 @@
+{
+  "task_id": "clarify_shoe_size",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "request": {
+    "original_text": "Find me waterproof hiking shoes that fit.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "footwear"},
+      {"attribute": "waterproof", "operator": "eq", "value": true}
+    ],
+    "preferences": [],
+    "clarification_needed": "What shoe size do you need?"
+  },
+  "ranking_rule": "none",
+  "expected": {"kind": "clarification", "question_contains": "size"}
+}

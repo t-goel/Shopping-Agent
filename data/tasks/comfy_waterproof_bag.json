@@ -1,0 +1,18 @@
+{
+  "task_id": "comfy_waterproof_bag",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "I want a comfortable waterproof bag for under $80. It would be nice to have room for at least 20 liters, and comfort matters to me, but it absolutely has to be genuinely waterproof.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "bags"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "price", "operator": "lte", "value": 80},
+      {"attribute": "capacity_liters", "operator": "gte", "value": 20, "hard": false}
+    ],
+    "preferences": ["comfortable"]
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["harbor-backpack"]}
+}

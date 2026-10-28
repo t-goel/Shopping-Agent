@@ -1,0 +1,17 @@
+{
+  "task_id": "highest_rated_waterproof_shoe",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "Find the highest-rated waterproof hiking shoe in US size 9. If several shoes are tied on average rating, any of them is a fine answer.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "footwear"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "size", "operator": "eq", "value": "9"}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "highest_rating",
+  "expected": {"kind": "product", "valid_product_ids": ["granite-hiker", "tarn-fell"]}
+}

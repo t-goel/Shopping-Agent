@@ -191,15 +191,20 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "runs.jsonl"
     env = {**os.environ, "PYTHONPATH": str(root / "src")}
-    command = [sys.executable, "-m", "shopping_agent.cli", "run", "--repetitions", "1", "--output", str(output)]
-    completed = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=30)
+    command = [
+        sys.executable, "-m", "shopping_agent.cli", "run", "--repetitions", "1",
+        # Bags tasks need one read per product in the category (9) plus re-verification;
+        # the pilot-era default of 10 would starve the baseline before it could cart.
+        "--max-calls", "20", "--output", str(output),
+    ]
+    completed = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=180)
     assert completed.returncode == 0, completed.stderr
     rows = [json.loads(line) for line in output.read_text().splitlines()]
-    assert len(rows) == 5 and all(row["is_successful"] for row in rows)
-    assert json.loads(completed.stdout)["overall"]["trials"] == 5
-    again = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=30)
+    assert len(rows) == 15 and all(row["is_successful"] for row in rows)
+    assert json.loads(completed.stdout)["overall"]["trials"] == 15
+    again = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=180)
     assert again.returncode != 0
-    assert len(output.read_text().splitlines()) == 5
+    assert len(output.read_text().splitlines()) == 15
 
 
 @pytest.mark.parametrize("new_price", [96, 120])

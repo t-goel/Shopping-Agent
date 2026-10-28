@@ -1,0 +1,18 @@
+{
+  "task_id": "no_big_waterproof_bag",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "Find a waterproof bag that can hold at least 40 liters for under $100.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "bags"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "capacity_liters", "operator": "gte", "value": 40},
+      {"attribute": "price", "operator": "lte", "value": 100}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {"kind": "no_valid_product"}
+}

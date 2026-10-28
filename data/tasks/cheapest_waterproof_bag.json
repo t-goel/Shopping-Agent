@@ -1,0 +1,17 @@
+{
+  "task_id": "cheapest_waterproof_bag",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "request": {
+    "original_text": "Find the cheapest waterproof bag with at least 15 liters of capacity.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "bags"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "capacity_liters", "operator": "gte", "value": 15}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["harbor-backpack"]}
+}

@@ -1,0 +1,19 @@
+{
+  "task_id": "duffel_price_drop",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "request": {
+    "original_text": "Find the cheapest waterproof bag with at least 25 liters of capacity for at most $150. Prices at this store change without warning, so compare current prices before you decide.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "bags"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "capacity_liters", "operator": "gte", "value": 25},
+      {"attribute": "price", "operator": "lte", "value": 150}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["headwater-duffel"]},
+  "mutations": [{"after_observations": 1, "product_id": "headwater-duffel", "price": 92.00}]
+}

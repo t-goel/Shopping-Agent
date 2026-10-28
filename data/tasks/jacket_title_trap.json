@@ -1,0 +1,17 @@
+{
+  "task_id": "jacket_title_trap",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "request": {
+    "original_text": "Find the cheapest jacket in size M that is genuinely waterproof — check the actual product details, not just the listing headline.",
+    "constraints": [
+      {"attribute": "category", "operator": "eq", "value": "jackets"},
+      {"attribute": "waterproof", "operator": "eq", "value": true},
+      {"attribute": "size", "operator": "eq", "value": "M"}
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {"kind": "product", "valid_product_ids": ["ridge-shell"]}
+}

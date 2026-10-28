@@ -15,6 +15,10 @@ def test_examples_load_and_reference_a_known_catalog():
     assert set(tasks) == {
         "cheapest_waterproof_jacket", "no_waterproof_under_50", "price_change",
         "clarify_jacket_size", "stock_change",
+        "cheapest_waterproof_bag", "clarify_shoe_size", "highest_rated_waterproof_shoe",
+        "comfy_waterproof_bag", "jacket_title_trap", "sponsored_shoe_search",
+        "no_big_waterproof_bag", "top_rated_waterproof_bag", "duffel_price_drop",
+        "stock_replenished_shoe",
     }
 
     assert all(task.catalog_version == catalog.version for task in tasks.values())

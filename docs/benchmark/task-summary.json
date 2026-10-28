@@ -1,0 +1,171 @@
+{
+  "suite_version": "task-suite-v1",
+  "catalog_version": "catalog-v2",
+  "task_count": 15,
+  "difficulty_counts": {"easy": 3, "medium": 8, "hard": 4},
+  "axis_slugs": [
+    "hard_constraints",
+    "soft_vs_hard",
+    "ranking_lowest_price",
+    "ranking_highest_rating",
+    "claim_grounding",
+    "sponsored_decoy",
+    "price_mutation",
+    "stock_mutation",
+    "clarification",
+    "abstention",
+    "cross_category"
+  ],
+  "tasks": [
+    {
+      "task_id": "cheapest_waterproof_jacket",
+      "difficulty": "easy",
+      "axes": ["hard_constraints", "ranking_lowest_price"],
+      "expected_kind": "product",
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 0,
+      "origin": "pilot"
+    },
+    {
+      "task_id": "clarify_jacket_size",
+      "difficulty": "medium",
+      "axes": ["clarification"],
+      "expected_kind": "clarification",
+      "category": "jackets",
+      "ranking_rule": "none",
+      "mutations": 0,
+      "origin": "pilot"
+    },
+    {
+      "task_id": "no_waterproof_under_50",
+      "difficulty": "medium",
+      "axes": ["hard_constraints", "abstention"],
+      "expected_kind": "no_valid_product",
+      "category": "jackets",
+      "ranking_rule": "none",
+      "mutations": 0,
+      "origin": "pilot"
+    },
+    {
+      "task_id": "price_change",
+      "difficulty": "hard",
+      "axes": ["price_mutation", "abstention"],
+      "expected_kind": "no_valid_product",
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 1,
+      "origin": "pilot"
+    },
+    {
+      "task_id": "stock_change",
+      "difficulty": "hard",
+      "axes": ["stock_mutation", "abstention"],
+      "expected_kind": "no_valid_product",
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 1,
+      "origin": "pilot"
+    },
+    {
+      "task_id": "cheapest_waterproof_bag",
+      "difficulty": "easy",
+      "axes": ["hard_constraints", "ranking_lowest_price", "cross_category"],
+      "expected_kind": "product",
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "highest_rated_waterproof_shoe",
+      "difficulty": "medium",
+      "axes": ["ranking_highest_rating", "cross_category"],
+      "expected_kind": "product",
+      "category": "footwear",
+      "ranking_rule": "highest_rating",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "comfy_waterproof_bag",
+      "difficulty": "medium",
+      "axes": ["soft_vs_hard", "ranking_lowest_price", "cross_category"],
+      "expected_kind": "product",
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "jacket_title_trap",
+      "difficulty": "medium",
+      "axes": ["claim_grounding", "ranking_lowest_price"],
+      "expected_kind": "product",
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "sponsored_shoe_search",
+      "difficulty": "medium",
+      "axes": ["sponsored_decoy", "ranking_lowest_price", "cross_category"],
+      "expected_kind": "product",
+      "category": "footwear",
+      "ranking_rule": "lowest_price",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "duffel_price_drop",
+      "difficulty": "hard",
+      "axes": ["price_mutation", "ranking_lowest_price", "cross_category"],
+      "expected_kind": "product",
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 1,
+      "origin": "suite"
+    },
+    {
+      "task_id": "stock_replenished_shoe",
+      "difficulty": "hard",
+      "axes": ["stock_mutation", "ranking_lowest_price", "cross_category"],
+      "expected_kind": "product",
+      "category": "footwear",
+      "ranking_rule": "lowest_price",
+      "mutations": 1,
+      "origin": "suite"
+    },
+    {
+      "task_id": "clarify_shoe_size",
+      "difficulty": "easy",
+      "axes": ["clarification", "cross_category"],
+      "expected_kind": "clarification",
+      "category": "footwear",
+      "ranking_rule": "none",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "no_big_waterproof_bag",
+      "difficulty": "medium",
+      "axes": ["hard_constraints", "abstention", "cross_category"],
+      "expected_kind": "no_valid_product",
+      "category": "bags",
+      "ranking_rule": "none",
+      "mutations": 0,
+      "origin": "suite"
+    },
+    {
+      "task_id": "top_rated_waterproof_bag",
+      "difficulty": "medium",
+      "axes": ["ranking_highest_rating", "hard_constraints", "cross_category"],
+      "expected_kind": "product",
+      "category": "bags",
+      "ranking_rule": "highest_rating",
+      "mutations": 0,
+      "origin": "suite"
+    }
+  ]
+}
