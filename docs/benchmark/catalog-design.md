@@ -64,7 +64,7 @@ Each type below has at least one concrete instance per category where it applies
 
 ## How the catalog enables the planned task axes
 
-| Planned axis (10-task suite) | Catalog support |
+| Planned axis (30-task suite) | Catalog support |
 |---|---|
 | Hard-constraint satisfaction | Cross-category hard-constraint surfaces: `waterproof`, `size`, `capacity_liters`, price caps, plus availability. Near-misses fail exactly one. |
 | Ranking / comparison | `lowest_price` tasks have tight candidate sets (`harbor-backpack` vs. `basalt-carryall`; `granite-hiker` vs. `tarn-fell`); `highest_rating` tasks hit the `canyon-pack` (4.67, not waterproof), `cinder-hiker` (5.0, out of stock), and the 4.5-tie traps. |

@@ -1,11 +1,18 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from server.app import create_app
-from server.state import Store, load_examples
+from server.state import ROOT, Store, load_examples
+
+HARNESS_TASKS = ROOT / "data/tasks/harness"
 
 
-def client():
-    catalog, tasks = load_examples()
+def client(tasks_path: Path | None = None):
+    catalog, tasks = load_examples() if tasks_path is None else load_examples(tasks_path=tasks_path)
+    if tasks_path is None:
+        _, harness = load_examples(tasks_path=HARNESS_TASKS)
+        tasks = {**tasks, **harness}
     return TestClient(create_app(Store(catalog, tasks)))
 
 

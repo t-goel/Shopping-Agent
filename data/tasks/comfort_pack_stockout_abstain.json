@@ -1,0 +1,46 @@
+{
+  "task_id": "comfort_pack_stockout_abstain",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I need a waterproof 30L pack under $100. Comfort reviews would be nice, but waterproof is non-negotiable for all-day rain.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "eq",
+        "value": 30
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": [
+      "comfortable"
+    ]
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "no_valid_product"
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "basalt-carryall",
+      "stock": 0
+    }
+  ]
+}

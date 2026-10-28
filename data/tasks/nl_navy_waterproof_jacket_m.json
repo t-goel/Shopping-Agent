@@ -1,0 +1,40 @@
+{
+  "task_id": "nl_navy_waterproof_jacket_m",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I need a navy waterproof jacket in medium. Cheapest option that is genuinely waterproof.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "M"
+      },
+      {
+        "attribute": "color",
+        "operator": "eq",
+        "value": "navy"
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "ridge-shell"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "task_id": "price_hike_recover_to_alternative",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest in-stock waterproof medium jacket at or under $120.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "M"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 120
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "summit-shell"
+    ]
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "ridge-shell",
+      "price": 130.0
+    }
+  ]
+}

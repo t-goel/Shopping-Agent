@@ -1,0 +1,52 @@
+{
+  "task_id": "price_hike_daypack_recover_carryall",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest waterproof pack between 20 and 30 liters under $100.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "gte",
+        "value": 20
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 30
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "basalt-carryall"
+    ]
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "harbor-backpack",
+      "price": 99.0
+    }
+  ]
+}

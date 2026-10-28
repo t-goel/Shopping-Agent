@@ -1,0 +1,40 @@
+{
+  "task_id": "nl_cheapest_waterproof_jacket_s",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest waterproof jacket in size small under $100. In stock only.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "S"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "river-shell"
+    ]
+  }
+}

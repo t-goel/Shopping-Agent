@@ -1,0 +1,44 @@
+{
+  "task_id": "stockout_size_s_jacket_empty",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Waterproof size-small jacket under $100, cheapest still available.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "S"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "no_valid_product"
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "river-shell",
+      "stock": 0
+    }
+  ]
+}

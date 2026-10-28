@@ -1,0 +1,45 @@
+{
+  "task_id": "nl_cheapest_waterproof_daypack",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Find me the lowest-priced backpack that's actually waterproof\u2014daypack size, not a giant expedition bag. Budget $80.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "gte",
+        "value": 20
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 25
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 80
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "harbor-backpack"
+    ]
+  }
+}

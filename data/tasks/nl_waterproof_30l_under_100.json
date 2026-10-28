@@ -1,0 +1,40 @@
+{
+  "task_id": "nl_waterproof_30l_under_100",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Find a waterproof 30-liter pack under $100. Cheapest wins.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "eq",
+        "value": 30
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "basalt-carryall"
+    ]
+  }
+}

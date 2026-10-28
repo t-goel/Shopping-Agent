@@ -1,0 +1,37 @@
+{
+  "task_id": "no_waterproof_shoe_size10",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Men's US 10 trail shoe under $100 that can handle real rain and is actually available.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "10"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "no_valid_product"
+  }
+}

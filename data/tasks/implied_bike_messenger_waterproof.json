@@ -1,0 +1,40 @@
+{
+  "task_id": "implied_bike_messenger_waterproof",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Bike commute through downpours. I already wear a hydration backpack, so I need one other bag that hangs across the body for papers and stays dry. Keep it at or under $80.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 15
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 80
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "umbra-messenger"
+    ]
+  }
+}

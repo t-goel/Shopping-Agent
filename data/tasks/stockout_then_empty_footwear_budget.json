@@ -1,0 +1,44 @@
+{
+  "task_id": "stockout_then_empty_footwear_budget",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Waterproof size-9 hiker under $100, cheapest available.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "no_valid_product"
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "tarn-fell",
+      "stock": 0
+    }
+  ]
+}

@@ -39,7 +39,7 @@ py -m shopping_agent.cli report results/rules.jsonl
 py -m pytest -q
 ```
 
-Defaults: three repetitions, seeded shuffled task order (`498`), ten public tool calls,
+Defaults: three repetitions, seeded shuffled task order (`498`), twenty public tool calls,
 60 seconds per worker trial. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
 `--max-calls`, and `--timeout` are configurable. Choose a new output path for each run;
 existing records are never silently overwritten. The CLI runs the existing FastAPI
@@ -47,14 +47,14 @@ routes in-process inside isolated workers, so no storefront/server launch or mod
 key is required. Run from this checkout; the mock-store application is not bundled
 in a standalone wheel.
 
-The baseline receives supplied structured requests and ranking rules, not expected
-answers. It does not evaluate language parsing, an LLM, or browser navigation.
-The clarification task supplies `request.clarification_needed`, including the exact
-question. Its successful trials measure routing a supplied clarification instruction,
-not discovering ambiguity. Expected outcome objects are hidden, but this parsed input
-is assistance. Before LLM comparisons, either remove that directive from model inputs
-and evaluate ambiguity detection separately, or give all conditions identical parsed
-assistance and explicitly exclude ambiguity discovery from the comparison.
+The scored suite (`data/tasks/*.json`, suite-v3, 10 easy / 10 medium / 10 hard) is
+**Surface B**: agents receive natural-language text only. Constraints, ranking rules,
+planted clarification strings, and expected outcomes stay evaluator-held. The rules
+baseline is for **Surface A** harness fixtures under `data/tasks/harness/` (structured
+request + ranking rule); run it with `--tasks data/tasks/harness`. Surface A 100%
+success validates plumbing, not shopping competence. See
+[`docs/benchmark/task-design.md`](docs/benchmark/task-design.md) and
+[`docs/benchmark/task-suite.md`](docs/benchmark/task-suite.md).
 Scoring uses final live store state and cart contents. Failures remain in the success
 rate denominator. Constraint satisfaction is averaged over trials expecting a product
 with at least one hard constraint; empty no-match/clarification selections are not

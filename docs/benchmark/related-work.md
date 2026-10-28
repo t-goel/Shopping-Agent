@@ -62,7 +62,7 @@ WebMall is the first offline *multi-shop* benchmark for web agents: four simulat
 | Claim grounding / unsupported-claim audit | No | No | No (verifies actions and final state, not verbalized claims) | No | No | **Yes — every product claim audited against observations (supports / contradicts / unknown)** |
 | Abstention & clarification | No (instructions complete) | No | No (all tasks achievable) | No | No | **Yes — `clarification_needed` and `no_valid_product` are scored outcomes** |
 | Engineered decoys (sponsored, keyword-stuffed, near-miss) | No (natural catalog noise) | No | No | No | No | **Yes — seeded decoy and near-miss placements in result lists** |
-| # Tasks | 12,087 instructions (~500-instruction test split) | 2,000+ tasks | 812 tasks | 57 tasks | 91 tasks (11 categories) | Pilot: 5/10 authored tasks (3 easy / 3 medium / 4 hard target) |
+| # Tasks | 12,087 instructions (~500-instruction test split) | 2,000+ tasks | 812 tasks | 57 tasks | 91 tasks (11 categories) | Surface B: 30 tasks (10 easy / 10 medium / 10 hard); Surface A harness: 5 |
 | Open vs. closed world | Closed (fixed Amazon-derived catalog) | Effectively open (real sites at collection time) | Closed but live (self-hosted, reproducible) | Closed (fixed question set + Amazon data) | Closed (Common Crawl-derived snapshot) | Closed by design — evaluator-owned ground truth, versioned examples |
 
 ## Gap Statement

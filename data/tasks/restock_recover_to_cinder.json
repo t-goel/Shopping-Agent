@@ -1,0 +1,47 @@
+{
+  "task_id": "restock_recover_to_cinder",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest waterproof size-9 shoe under $140 that is actually available right now.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 140
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "cinder-hiker"
+    ]
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "cinder-hiker",
+      "stock": 3
+    }
+  ]
+}

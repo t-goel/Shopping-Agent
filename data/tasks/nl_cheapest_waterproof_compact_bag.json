@@ -1,0 +1,40 @@
+{
+  "task_id": "nl_cheapest_waterproof_compact_bag",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest waterproof bag at or under 15 liters, budget $80. I need something compact, not a hiking backpack.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 15
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 80
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "umbra-messenger"
+    ]
+  }
+}

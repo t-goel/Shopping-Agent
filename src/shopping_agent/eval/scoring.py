@@ -49,7 +49,7 @@ def score(task: TaskDefinition, output: AgentOutput, snapshot: dict) -> tuple[bo
         best_price = min(p.price for p in candidates)
         candidates = [p for p in candidates if p.price == best_price]
 
-    elif task.ranking_rule == "highest_rating" and candidates:
+    elif task.ranking_rule in {"highest_rating", "highest_rating_then_reviews"} and candidates:
         def average_rating(product: Product) -> float:
             if product.reviews:
                 return sum(r.rating for r in product.reviews) / len(product.reviews)
@@ -57,6 +57,10 @@ def score(task: TaskDefinition, output: AgentOutput, snapshot: dict) -> tuple[bo
 
         best_rating = max(average_rating(p) for p in candidates)
         candidates = [p for p in candidates if average_rating(p) == best_rating]
+
+        if task.ranking_rule == "highest_rating_then_reviews" and len(candidates) > 1:
+            most_reviews = max(len(p.reviews) for p in candidates)
+            candidates = [p for p in candidates if len(p.reviews) == most_reviews]
 
     valid_ids = {p.product_id for p in candidates} & set(task.expected.valid_product_ids)
 

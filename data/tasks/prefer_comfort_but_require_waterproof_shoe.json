@@ -1,0 +1,43 @@
+{
+  "task_id": "prefer_comfort_but_require_waterproof_shoe",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Size 9 under $100. I'd love something soft and camp-casual if reviews rave about comfort, but creek crossings mean it has to be waterproof. Cheapest pair that actually qualifies.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": [
+      "comfortable",
+      "soft"
+    ]
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "tarn-fell"
+    ]
+  }
+}

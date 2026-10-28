@@ -1,0 +1,47 @@
+{
+  "task_id": "stockout_recover_footwear",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Cheapest waterproof size-9 hiker still available under $140.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 140
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "granite-hiker"
+    ]
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "tarn-fell",
+      "stock": 0
+    }
+  ]
+}

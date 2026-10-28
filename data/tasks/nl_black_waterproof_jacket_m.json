@@ -1,0 +1,40 @@
+{
+  "task_id": "nl_black_waterproof_jacket_m",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Black waterproof jacket, medium, in stock. Lowest price among matches.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "M"
+      },
+      {
+        "attribute": "color",
+        "operator": "eq",
+        "value": "black"
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "summit-shell"
+    ]
+  }
+}

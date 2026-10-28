@@ -1,0 +1,33 @@
+{
+  "task_id": "clarify_bag_capacity",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I need a waterproof bag under $100 for travel in the rain. Some days it's just a laptop; other trips I pack a change of clothes. Get me something in stock that fits the trip.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "clarification",
+    "question_contains": "liter"
+  }
+}

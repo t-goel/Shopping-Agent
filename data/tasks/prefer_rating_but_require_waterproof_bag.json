@@ -1,0 +1,38 @@
+{
+  "task_id": "prefer_rating_but_require_waterproof_bag",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "For wet-weather commuting under $100, grab whichever bag shoppers rate highest. I care about reviews more than brand, but it still has to keep my stuff dry in heavy rain.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": [
+      "high ratings",
+      "comfortable"
+    ]
+  },
+  "ranking_rule": "highest_rating",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "harbor-backpack"
+    ]
+  }
+}

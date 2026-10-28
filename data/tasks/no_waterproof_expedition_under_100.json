@@ -1,0 +1,37 @@
+{
+  "task_id": "no_waterproof_expedition_under_100",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I need a waterproof expedition duffel—big enough for a week of gear, at least 50 liters—but I refuse to spend more than $100 even if the good ones cost more.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "gte",
+        "value": 50
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "no_valid_product"
+  }
+}
