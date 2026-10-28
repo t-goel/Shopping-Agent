@@ -12,6 +12,10 @@ evaluator-held.
 
 **Difficulty:** 10 easy / 10 medium / 10 hard.
 
+**Paper subset:** the ICLR draft centers on ten of these tasks (4 easy / 3 medium /
+3 hard) mirrored under [`data/tasks/b/`](../../data/tasks/b/). Full suite stays
+in [`data/tasks/`](../../data/tasks/).
+
 **Out of scope:** multi-shop checkout, live web, multi-turn dialogs, subjective
 “best” without a declared ranking rule.
 

@@ -24,7 +24,7 @@
 \maketitle
 
 \begin{abstract}
-We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions rather than catalog scale or general web navigation. Agents operate in a resettable mock storefront whose public listings can conflict with structured ground-truth specifications. The scored suite is \textbf{Surface~B}: natural-language requests only, with typed constraints, ranking rules, mutations, and expected outcomes held by the evaluator. This paper centers on ten Surface~B tasks that span hard-constraint satisfaction, decoy resistance, clarification and abstention, soft-versus-hard preference conflicts, scenario implication, and recovery or abstention after mid-trial price or stock mutations. A larger 30-task release suite exists; we discuss these ten. Evaluating model and browser agents on Surface~B under the same protocol is next.
+We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions rather than catalog scale or general web navigation. Agents operate in a resettable mock storefront whose public listings can conflict with structured ground-truth specifications. The scored suite is \textbf{Surface~B}: natural-language requests only, with typed constraints, ranking rules, mutations, and expected outcomes held by the evaluator. The suite contains ten Surface~B tasks (four easy, three medium, three hard) that span hard-constraint satisfaction, decoy resistance, clarification and abstention, soft-versus-hard preference conflicts, scenario implication, and recovery or abstention after mid-trial price mutations. Evaluating model and browser agents on Surface~B under the same protocol is next.
 \end{abstract}
 
 \section{Introduction}
@@ -85,7 +85,7 @@ The scored benchmark is \textbf{Surface~B}: the agent sees only the natural-lang
 
 \subsection{Task Descriptions}
 
-Each task is a versioned JSON definition pinned to a catalog version. Evaluator-held fields specify: (i)~hard constraints as typed attribute/operator/value triples, optionally with soft preferences; (ii)~a ranking rule among valid candidates (\texttt{lowest\_price}, \texttt{highest\_rating}, \texttt{highest\_rating\_then\_reviews}, or \texttt{none}); (iii)~an expected outcome; and (iv)~optional scheduled mutations that fire after a fixed number of agent observations. Expected outcomes are withheld from the Surface~B agent and take one of three kinds:
+Each task is a versioned JSON definition pinned to \texttt{catalog-v2} (20 products across jackets, bags, and footwear). Evaluator-held fields specify: (i)~hard constraints as typed attribute/operator/value triples, optionally with soft preferences; (ii)~a ranking rule among valid candidates (\texttt{lowest\_price}, \texttt{highest\_rating}, \texttt{highest\_rating\_then\_reviews}, or \texttt{none}); (iii)~an expected outcome; and (iv)~optional scheduled mutations that fire after a fixed number of agent observations. Expected outcomes are withheld from the Surface~B agent and take one of three kinds:
 
 \begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
     \item \textbf{Product selection:} select and add to cart exactly one SKU from the expected valid set under the declared ranking rule, with live price and stock matching final store state.
@@ -93,7 +93,80 @@ Each task is a versioned JSON definition pinned to a catalog version. Evaluator-
     \item \textbf{Clarification:} terminate with \texttt{clarification\_needed}, ask a question that covers a required underspecified attribute (e.g., size), and do not select or cart any product.
 \end{itemize}
 
-Surface~B runs on \texttt{catalog-v2} (20 products across jackets, bags, and footwear). The release ships thirty tasks stratified 10 easy / 10 medium / 10 hard; this paper discusses ten that cover the failure modes we care about (Table~\ref{tab:core-tasks}). Easy tasks state constraints and a ranking cue while catalog decoys still punish title-trust. Medium tasks cover clarification under temptation to guess, empty-set abstention under attractive decoys, and soft preference language that pulls toward non-waterproof near-misses. Hard tasks schedule mid-trial price or stock changes without telegraphing a re-check, or ask the agent to map a scenario onto attributes.
+The scored suite comprises the ten tasks in Tables~\ref{tab:tasks-easy}--\ref{tab:tasks-hard}: four easy, three medium, and three hard. Easy tasks state constraints and a ranking cue while catalog decoys still punish title-trust. Medium tasks cover clarification under temptation to guess, empty-set abstention under attractive decoys, and soft preference language that pulls toward non-waterproof near-misses. Hard tasks schedule a mid-trial price change without telegraphing a re-check, force abstention when recovery is impossible, or ask the agent to map a scenario onto attributes. Agents see only the natural-language request; winners, traps, mutations, and typed constraints stay with the evaluator.
+
+\begin{table}[t]
+\centering
+\caption{Easy Surface~B tasks ($n{=}4$). Expected winners are evaluator-held.}
+\label{tab:tasks-easy}
+\scriptsize
+\begin{tabular}{@{}lp{2.6cm}p{3.4cm}@{}}
+\toprule
+Task & Expected & Primary trap \\
+\midrule
+\texttt{nl\_cheapest\_waterproof\_jacket\_m} & \texttt{ridge-shell} & sponsored / reseller titles \\
+\texttt{nl\_cheapest\_waterproof\_daypack} & \texttt{harbor-backpack} & rain-cover / sling / expedition \\
+\texttt{nl\_size9\_waterproof\_shoe\_by\_rating} & \texttt{tarn-fell} & OOS 5$\star$; rating/review tie \\
+\texttt{nl\_highest\_rated\_waterproof\_jacket\_m} & \texttt{summit-shell} & 5$\star$ windbreaker not waterproof \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Medium Surface~B tasks ($n{=}3$).}
+\label{tab:tasks-medium}
+\scriptsize
+\begin{tabular}{@{}lp{2.8cm}p{3.2cm}@{}}
+\toprule
+Task & Expected & Primary trap \\
+\midrule
+\texttt{clarify\_jacket\_size\_nl} & ask size & ``usually medium'' tempts guess \\
+\texttt{no\_waterproof\_jacket\_under\_50} & abstain & sponsored city windbreaker \\
+\texttt{prefer\_comfort\_but\_require\_waterproof\_pack} & \texttt{basalt-carryall} & comfort $\to$ rain-cover pack \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Hard Surface~B tasks ($n{=}3$).}
+\label{tab:tasks-hard}
+\scriptsize
+\begin{tabular}{@{}lp{2.8cm}p{3.2cm}@{}}
+\toprule
+Task & Expected & Primary trap \\
+\midrule
+\texttt{price\_hike\_recover\_to\_alternative} & \texttt{summit-shell} & ridge hikes after first look \\
+\texttt{mutation\_then\_empty} & abstain after hike & recovery impossible; stop \\
+\texttt{implied\_monsoon\_kit\_single\_sku} & \texttt{harbor-backpack} & scenario, not attribute dump \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Representative task~1 (easy):} \texttt{nl\_cheapest\_waterproof\_jacket\_m}.
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \textbf{Input format:} natural-language request only (Surface~B). Example: ``I need the cheapest waterproof jacket that fits medium, and I won't go over a hundred dollars.'' Typed constraints (\texttt{category}=\texttt{jackets}, \texttt{waterproof}=\texttt{true}, \texttt{size}=\texttt{M}, \texttt{price}$\le$100) and ranking rule \texttt{lowest\_price} are evaluator-held.
+    \item \textbf{Expected output:} select and cart \texttt{ridge-shell}; terminate with \texttt{completed}.
+    \item \textbf{Success criteria:} selected id is \texttt{ridge-shell}; cart quantity~1 at live unit price with matching stock; no other SKU selected.
+    \item \textbf{Why challenging:} sponsored and reseller titles look waterproof or cheaper; validity is determined by structured attributes, not titles.
+\end{itemize}
+
+\paragraph{Representative task~2 (medium):} \texttt{clarify\_jacket\_size\_nl}.
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \textbf{Input format:} NL request only. Example: ``Find a waterproof jacket under \$100 for steady rain. I usually wear medium but I'm not sure this brand runs the same---figure something out.'' Constraints omit size; no ranking rule.
+    \item \textbf{Expected output:} terminate with \texttt{clarification\_needed}; ask a question that covers size; do not select or cart.
+    \item \textbf{Success criteria:} clarification termination; response contains a size cue; empty selection and empty cart.
+    \item \textbf{Why challenging:} ``usually medium'' tempts the agent to guess size~M and purchase instead of asking.
+\end{itemize}
+
+\paragraph{Representative task~3 (hard):} \texttt{price\_hike\_recover\_to\_alternative}.
+\begin{itemize}[leftmargin=*,noitemsep,topsep=0pt]
+    \item \textbf{Input format:} NL request only. Example: ``Cheapest in-stock waterproof medium jacket at or under \$120.'' After the first agent observation, a scheduled mutation raises \texttt{ridge-shell} to \$130 (over budget). The prompt does not mention re-checking price.
+    \item \textbf{Expected output:} recover to \texttt{summit-shell} under live post-mutation state; cart that SKU; terminate with \texttt{completed}.
+    \item \textbf{Success criteria:} final selection and cart are \texttt{summit-shell} at post-mutation live price and stock.
+    \item \textbf{Why challenging:} agents that reuse a stale snapshot keep the now-invalid first winner; success requires re-verification after state change.
+\end{itemize}
 
 \subsection{Task Design Principles}
 
@@ -110,19 +183,19 @@ Task authoring follows a small set of rules that keep outcomes deterministically
 
 \subsection{Difficulty distribution}
 
-Difficulty labels follow the dominant failure mode, not catalog size. The ten tasks we discuss here break down as three easy, three medium, and four hard (Table~\ref{tab:difficulty}). The fuller thirty-task release keeps a 10/10/10 split for later model runs. Aggregate reports always stratify by difficulty so easy wins cannot mask hard failures.
+Difficulty labels follow the dominant failure mode, not catalog size. The ten tasks break down as four easy, three medium, and three hard (Table~\ref{tab:difficulty}). Aggregate reports always stratify by difficulty so easy wins cannot mask hard failures.
 
 \begin{table}[t]
 \centering
-\caption{Difficulty focus for the ten Surface~B tasks discussed in this paper.}
+\caption{Difficulty focus for the ten Surface~B tasks.}
 \label{tab:difficulty}
 \begin{tabular}{lccp{5.6cm}}
 \toprule
 Tier & $n$ & Focus & What must \emph{not} appear in agent-facing text \\
 \midrule
-Easy & 3 & Explicit constraints + ranking & --- (decoys still live in catalog) \\
+Easy & 4 & Explicit constraints + ranking & --- (decoys still live in catalog) \\
 Medium & 3 & Clarify / abstain / soft-vs-hard & Named trap SKUs or decoy-rejection coaching \\
-Hard & 4 & Mutations / implication & Mutation telegraphs (``re-check'', ``confirm stock'') \\
+Hard & 3 & Mutations / implication & Mutation telegraphs (``re-check'', ``confirm stock'') \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -179,34 +252,11 @@ A run dumps the JSONL; a report builds summary tables and a local HTML page filt
 
 \subsection{Core Surface~B tasks}
 
-The release has thirty NL tasks. This paper sticks to ten that cover the failure modes we care about without repeating the same jacket query (Table~\ref{tab:core-tasks}). Checks are twofold: the loader re-derives the expected valid set from \texttt{catalog-v2} plus any mutations, and a human pass confirms each decoy has a named failure mode, soft preferences cannot override hard constraints, and hard prompts never say ``re-check price'' or ``confirm stock.'' Expected outcomes are hand-authored. We have not run model or browser agents on these tasks yet; this draft is about the suite and the scorer.
-
-\begin{table}[t]
-\centering
-\caption{Ten Surface~B tasks discussed in this paper. Winners and traps are evaluator-held; agents see the NL request only.}
-\label{tab:core-tasks}
-\scriptsize
-\begin{tabular}{@{}llp{3.6cm}p{3.2cm}@{}}
-\toprule
-Task & Diff. & Expected & Primary trap \\
-\midrule
-\texttt{nl\_cheapest\_waterproof\_jacket\_m} & easy & \texttt{ridge-shell} & sponsored / reseller titles \\
-\texttt{nl\_highest\_rated\_waterproof\_jacket\_m} & easy & \texttt{summit-shell} & 5$\star$ windbreaker not waterproof \\
-\texttt{nl\_size9\_waterproof\_shoe\_by\_rating} & easy & \texttt{tarn-fell} & OOS 5$\star$; rating/review tie \\
-\texttt{prefer\_comfort\_but\_require\_waterproof\_pack} & med. & \texttt{basalt-carryall} & comfort $\to$ rain-cover pack \\
-\texttt{clarify\_jacket\_size\_nl} & med. & ask size & ``usually medium'' tempts guess \\
-\texttt{no\_waterproof\_jacket\_under\_50} & med. & abstain & sponsored city windbreaker \\
-\texttt{price\_hike\_recover\_to\_alternative} & hard & \texttt{summit-shell} & ridge hikes after first look \\
-\texttt{stockout\_recover\_footwear} & hard & \texttt{granite-hiker} & tarn stocks out mid-trial \\
-\texttt{mutation\_then\_empty} & hard & abstain after hike & recovery impossible; stop \\
-\texttt{implied\_monsoon\_kit\_single\_sku} & hard & \texttt{harbor-backpack} & scenario, not attribute dump \\
-\bottomrule
-\end{tabular}
-\end{table}
+The benchmark is the ten NL tasks in Tables~\ref{tab:tasks-easy}--\ref{tab:tasks-hard} (also under \texttt{data/tasks/b/}). Two checks so far: the loader re-derives each expected valid set from \texttt{catalog-v2} plus any mutations, and a human pass confirms every decoy has a named failure mode, soft preferences cannot override hard constraints, and hard prompts never say ``re-check price'' or ``confirm stock.'' Expected outcomes are hand-authored. We have not run model or browser agents on these tasks yet; this draft is about the suite and the scorer.
 
 \subsection{Task quality gates}
 
-The loader rejects unknown attributes, clarification/outcome mismatches, and expected sets that disagree with catalog-plus-mutation derivation. All thirty \texttt{suite-v3} tasks pass that check. We still write about only the ten above: ranking, soft-versus-hard conflict, clarification, abstention, price and stock mutation, and implication.
+The loader rejects unknown attributes, clarification/outcome mismatches, and expected sets that disagree with catalog-plus-mutation derivation. All ten tasks pass that check and cover ranking, soft-versus-hard conflict, clarification, abstention, price mutation, and implication.
 
 \subsection{Inter-rater reliability}
 
@@ -219,7 +269,7 @@ No competence numbers yet. Unsupported-claim rate and human ratings stay unmeasu
 \section{Conclusion}
 \label{sec:conclusion}
 
-We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions: hard-constraint ledgers, marketing-versus-spec decoys, soft-versus-hard preference conflicts, clarification and abstention, scenario implication, and mid-trial price or stock mutations. Surface~B withholds the answer key behind natural-language requests; this paper centers on ten tasks that span those modes. A resettable mock store with versioned catalog and task definitions keeps outcomes reproducible and separate from general web navigation. Running model and browser agents on those Surface~B tasks under the same protocol is next.
+We present a shopping-agent benchmark that diagnoses reliable product selection under controlled failure conditions: hard-constraint ledgers, marketing-versus-spec decoys, soft-versus-hard preference conflicts, clarification and abstention, scenario implication, and mid-trial price mutations. Surface~B withholds the answer key behind natural-language requests; the suite comprises ten tasks (four easy, three medium, three hard) that span those modes. A resettable mock store with versioned catalog and task definitions keeps outcomes reproducible and separate from general web navigation. Running model and browser agents on those Surface~B tasks under the same protocol is next.
 
 \subsubsection*{Acknowledgments}
 
@@ -235,7 +285,7 @@ We present a shopping-agent benchmark that diagnoses reliable product selection 
 \subsection{Surface~B coverage axes}
 \label{app:tasks}
 
-The ten tasks in Table~\ref{tab:core-tasks} map onto the claimed dimensions: constraint satisfaction and ranking (\texttt{nl\_cheapest\_waterproof\_jacket\_m}, \texttt{nl\_highest\_rated\_waterproof\_jacket\_m}, \texttt{nl\_size9\_waterproof\_shoe\_by\_rating}); soft-versus-hard (\texttt{prefer\_comfort\_but\_require\_waterproof\_pack}); clarification (\texttt{clarify\_jacket\_size\_nl}); abstention (\texttt{no\_waterproof\_jacket\_under\_50}); mutation recovery (\texttt{price\_hike\_recover\_to\_alternative}, \texttt{stockout\_recover\_footwear}); mutation abstention (\texttt{mutation\_then\_empty}); implication (\texttt{implied\_monsoon\_kit\_single\_sku}). The remaining twenty release tasks are near-variants on other categories or mutation patterns; we leave them out of the main text.
+The ten tasks in Tables~\ref{tab:tasks-easy}--\ref{tab:tasks-hard} map onto the claimed dimensions: constraint satisfaction and ranking (\texttt{nl\_cheapest\_waterproof\_jacket\_m}, \texttt{nl\_cheapest\_waterproof\_daypack}, \texttt{nl\_size9\_waterproof\_shoe\_by\_rating}, \texttt{nl\_highest\_rated\_waterproof\_jacket\_m}); clarification (\texttt{clarify\_jacket\_size\_nl}); abstention (\texttt{no\_waterproof\_jacket\_under\_50}); soft-versus-hard (\texttt{prefer\_comfort\_but\_require\_waterproof\_pack}); mutation recovery (\texttt{price\_hike\_recover\_to\_alternative}); mutation abstention (\texttt{mutation\_then\_empty}); implication (\texttt{implied\_monsoon\_kit\_single\_sku}).
 
 \subsection{Decoy taxonomy (summary)}
 \label{app:decoys}

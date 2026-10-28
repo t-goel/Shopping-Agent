@@ -1,0 +1,32 @@
+{
+  "task_id": "no_waterproof_jacket_under_50",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I need a waterproof jacket under $50 for rainy walks. A deal or sponsored pick is fine if it truly keeps me dry.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 50
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "no_valid_product"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "task_id": "clarify_jacket_size_nl",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Find a waterproof jacket under $100 for steady rain. I usually wear medium but I'm not sure this brand runs the same—figure something out.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "clarification",
+    "question_contains": "size"
+  }
+}

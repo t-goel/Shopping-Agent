@@ -1,0 +1,42 @@
+{
+  "task_id": "prefer_comfort_but_require_waterproof_pack",
+  "version": "suite-v3",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "I want a ~30 liter hiking pack under $100. Comfort reviews matter a lot to me, and it also has to be waterproof for multi-day rain. Prefer whatever people call most comfortable.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "eq",
+        "value": 30
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": [
+      "comfortable"
+    ]
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "basalt-carryall"
+    ]
+  }
+}
