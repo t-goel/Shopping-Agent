@@ -20,7 +20,7 @@ from shopping_agent.verifier import check_constraints, verify_claims
 
 def observation(product):
     return ProductObservation(product=product, source_url="http://testserver/listing",
-                              observed_at=datetime.now(timezone.utc), catalog_version="catalog-v1")
+                              observed_at=datetime.now(timezone.utc), catalog_version="catalog-v2")
 
 
 def test_verifier_boundary_missing_boolean_and_claims():

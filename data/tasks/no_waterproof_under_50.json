@@ -1,7 +1,7 @@
 {
   "task_id": "no_waterproof_under_50",
   "version": "example-v1",
-  "catalog_version": "catalog-v1",
+  "catalog_version": "catalog-v2",
   "difficulty": "medium",
   "request": {
     "original_text": "Find a waterproof jacket under $50.",

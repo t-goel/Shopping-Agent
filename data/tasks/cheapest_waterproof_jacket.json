@@ -1,7 +1,7 @@
 {
   "task_id": "cheapest_waterproof_jacket",
   "version": "example-v1",
-  "catalog_version": "catalog-v1",
+  "catalog_version": "catalog-v2",
   "difficulty": "easy",
   "request": {
     "original_text": "Find the cheapest waterproof jacket in size M under $100.",
