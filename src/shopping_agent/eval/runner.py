@@ -93,7 +93,7 @@ def run_trial(
     catalog: CatalogExample,
     task: TaskDefinition,
     trial_number: int = 1,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent=None,
     on_trace=None,
@@ -196,7 +196,7 @@ def isolated_trial(
     catalog: CatalogExample,
     task: TaskDefinition,
     trial_number: int = 1,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent=None,
 ) -> TrialResult:
@@ -285,7 +285,7 @@ def run_suite(
     output: Path,
     repetitions: int = 3,
     seed: int = 498,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent_name: str = "rules",
 ):

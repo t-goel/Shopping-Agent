@@ -218,8 +218,9 @@ inflicted by the same runner code a third party can re-implement):
 ≤ 10 tool calls on the smallest tasks and **≈ 11 on bags** (the largest
 category: 9 products ⇒ one search plus one read per product, plus
 re-verification before carting). Production tool budget is therefore set at
-**M = 20** (the same number the test suite uses with `--max-calls 20`), with
-wall clock **S = 60 s**. Budgets are declared per run in `run_metadata`
+**M = 20** (CLI `--max-calls` default, `run_trial`/`isolated_trial`/`run_suite`
+defaults, and the suite tests that pass `max_calls=20`), with wall clock
+**S = 60 s**. Budgets are declared per run in `run_metadata`
 (`max_tool_calls`, `timeout_seconds`), not per task. Third parties must state
 the budgets they used when comparing scores with others'; the budget is part of
 protocol, part of the result.
