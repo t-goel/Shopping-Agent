@@ -231,7 +231,7 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     import sys
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "runs.jsonl"
-    env = {**os.environ, "PYTHONPATH": str(root / "src")}
+    env = {**os.environ, "PYTHONPATH": str(root / "src"), "NO_COLOR": "1"}
     command = [
         sys.executable, "-m", "shopping_agent.cli", "run",
         "--repetitions", "1",
@@ -242,7 +242,21 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     assert completed.returncode == 0, completed.stderr
     rows = [json.loads(line) for line in output.read_text().splitlines()]
     assert len(rows) == 5 and all(row["is_successful"] for row in rows)
-    assert json.loads(completed.stdout)["overall"]["trials"] == 5
+    assert completed.stdout.count("PASS") == 5
+    assert "Score: 5/5 (100%)" in completed.stdout
+    assert "All trials passed." in completed.stdout
+    json_command = [
+        sys.executable, "-m", "shopping_agent.cli", "run",
+        "--repetitions", "1",
+        "--tasks", str(root / "data" / "tasks" / "harness"),
+        "--output", str(tmp_path / "runs-json.jsonl"),
+        "--json",
+    ]
+    json_run = subprocess.run(
+        json_command, cwd=root, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert json_run.returncode == 0, json_run.stderr
+    assert json.loads(json_run.stdout)["overall"]["trials"] == 5
     again = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=30)
     assert again.returncode != 0
     assert len(output.read_text().splitlines()) == 5

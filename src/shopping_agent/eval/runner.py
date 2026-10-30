@@ -302,12 +302,14 @@ def run_suite(
     max_calls: int = 20,
     seconds: float = 60,
     agent_name: str = "rules",
-):
+    on_result=None,
+) -> list[TrialResult]:
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
+    results: list[TrialResult] = []
 
     # Refuse to overwrite previous experiments silently.
     with output.open("x", encoding="utf-8") as stream:
@@ -321,3 +323,8 @@ def run_suite(
                 result.run_metadata.update(seed=seed, task_order=order, task_position=position)
                 stream.write(result.model_dump_json() + "\n")
                 stream.flush()
+                results.append(result)
+                if on_result is not None:
+                    on_result(result)
+
+    return results

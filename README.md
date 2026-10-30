@@ -25,19 +25,20 @@ The mock store is synthetic and local-only. It does not make purchases or handle
 From the repository root, install `requirements-dev.txt`, then run:
 
 ```sh
-PYTHONPATH=src python -m shopping_agent.cli run --output results/rules.jsonl
-PYTHONPATH=src python -m shopping_agent.cli report results/rules.jsonl
+python eval.py run --output results/rules.jsonl
+python eval.py report results/rules.jsonl
 python -m pytest -q
 ```
 
 PowerShell equivalent:
 
 ```powershell
-$env:PYTHONPATH = "src"
-py -m shopping_agent.cli run --output results/rules.jsonl
-py -m shopping_agent.cli report results/rules.jsonl
+py eval.py run --output results/rules.jsonl
+py eval.py report results/rules.jsonl
 py -m pytest -q
 ```
+
+`eval.py` bootstraps `src/` for a checkout. After `py -m pip install -e .`, you can also use `shopping-agent` or `py -m shopping_agent`.
 
 Defaults: three repetitions, seeded shuffled task order (`498`), twenty public tool calls,
 60 seconds per worker trial. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
