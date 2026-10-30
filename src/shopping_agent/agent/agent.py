@@ -1,5 +1,6 @@
 """A Claude shopping agent."""
 
+import hashlib
 import json
 import os
 import re
@@ -56,12 +57,20 @@ constraints and the ranking rule. Return JSON only:
 
 class Agent:
     def __init__(self, api_key=None, model=None, max_turns=10):
+        self.prompt_version = hashlib.sha256(
+            (PROMPT + json.dumps(TOOLS, sort_keys=True)).encode()).hexdigest()
+        self.input_tokens = None
+        self.output_tokens = None
+        self._missing_usage = set()
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
         self.max_turns = max_turns
         self.url = "https://api.anthropic.com/v1/messages"
 
     def run(self, inputs: AgentInput, tools: ShoppingTools) -> AgentOutput:
+        self.input_tokens = None
+        self.output_tokens = None
+        self._missing_usage = set()
         if inputs.request.clarification_needed:
             return AgentOutput(response_text=inputs.request.clarification_needed, termination_reason="clarification_needed")
         if not self.api_key:
@@ -127,7 +136,16 @@ class Agent:
         if response.status_code != 200:
             raise RuntimeError(f"Claude API error:{response.status_code} {response.text}")
         
-        return response.json()
+        answer = response.json()
+        usage = answer.get("usage", {})
+        for field in ("input_tokens", "output_tokens"):
+            value = usage.get(field)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                self._missing_usage.add(field)
+                setattr(self, field, None)
+            elif field not in self._missing_usage:
+                setattr(self, field, (getattr(self, field) or 0) + value)
+        return answer
 
     def use_tool(self, name, arguments, tools):
         if name == "search":

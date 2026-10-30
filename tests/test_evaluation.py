@@ -90,10 +90,8 @@ def test_harness_tasks_complete_against_live_state(task_id):
 
 def test_rules_agent_cannot_solve_nl_surface_without_cheat_sheet():
     catalog, tasks = load_examples()
-    result = run_trial(catalog, tasks["nl_cheapest_waterproof_jacket_m"])
-    assert not result.is_successful
-    assert result.termination_reason == "unrecoverable_failure"
-    assert "structured Surface A" in (result.error or "")
+    with pytest.raises(ValueError, match="structured tasks"):
+        run_trial(catalog, tasks["nl_cheapest_waterproof_jacket_m"])
 
 
 def test_nl_agent_input_strips_constraints_ranking_and_planted_clarify():

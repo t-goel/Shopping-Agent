@@ -5,3 +5,5 @@ __pycache__/
 mock-store/storefront/node_modules/
 mock-store/storefront/dist/
 results/
+.env
+.env.*
