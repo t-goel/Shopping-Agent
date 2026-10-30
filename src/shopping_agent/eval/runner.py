@@ -12,13 +12,33 @@ from time import monotonic
 
 from shopping_agent.agent.agent import Agent as ClaudeAgent
 from shopping_agent.agent.rules import RulesAgent
-from shopping_agent.contracts import CartSelection, CatalogExample, TaskDefinition, TrialResult
+from shopping_agent.contracts import (
+    CartSelection,
+    CatalogExample,
+    ShoppingRequest,
+    TaskDefinition,
+    TrialResult,
+)
 from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput
 from shopping_agent.tools.api import CatalogAPI
 from shopping_agent.tools.budget import BudgetExceeded, BudgetedTools
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def agent_input_for_task(task: TaskDefinition) -> AgentInput:
+    """NL surface gets original_text only; structured keeps constraints + ranking."""
+    if task.agent_surface == "nl":
+        return AgentInput(
+            request=ShoppingRequest(original_text=task.request.original_text),
+            ranking_rule=None,
+        )
+
+    return AgentInput(
+        request=task.request.model_copy(deep=True),
+        ranking_rule=task.ranking_rule,
+    )
 
 
 def load_store_modules():
@@ -93,7 +113,7 @@ def run_trial(
     catalog: CatalogExample,
     task: TaskDefinition,
     trial_number: int = 1,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent=None,
     on_trace=None,
@@ -119,13 +139,7 @@ def run_trial(
         error = None
 
         try:
-            output = selected_agent.run(
-                AgentInput(
-                    request=task.request.model_copy(deep=True),
-                    ranking_rule=task.ranking_rule,
-                ),
-                tools,
-            )
+            output = selected_agent.run(agent_input_for_task(task), tools)
             output = AgentOutput.model_validate(output)
 
             if monotonic() >= tools.deadline:
@@ -196,7 +210,7 @@ def isolated_trial(
     catalog: CatalogExample,
     task: TaskDefinition,
     trial_number: int = 1,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent=None,
 ) -> TrialResult:
@@ -285,7 +299,7 @@ def run_suite(
     output: Path,
     repetitions: int = 3,
     seed: int = 498,
-    max_calls: int = 10,
+    max_calls: int = 20,
     seconds: float = 60,
     agent_name: str = "rules",
 ):

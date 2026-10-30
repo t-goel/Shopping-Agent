@@ -39,7 +39,7 @@ py -m shopping_agent.cli report results/rules.jsonl
 py -m pytest -q
 ```
 
-Defaults: three repetitions, seeded shuffled task order (`498`), ten public tool calls,
+Defaults: three repetitions, seeded shuffled task order (`498`), twenty public tool calls,
 60 seconds per worker trial. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
 `--max-calls`, and `--timeout` are configurable. Choose a new output path for each run;
 existing records are never silently overwritten. The CLI runs the existing FastAPI
