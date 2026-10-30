@@ -1,0 +1,120 @@
+{
+  "suite_version": "suite-v4",
+  "catalog_version": "catalog-v2",
+  "agent_surface": "nl",
+  "task_count": 10,
+  "difficulty_counts": {"easy": 3, "medium": 3, "hard": 4},
+  "axis_slugs": [
+    "hard_constraints",
+    "soft_vs_hard",
+    "ranking_lowest_price",
+    "ranking_highest_rating",
+    "claim_grounding",
+    "sponsored_decoy",
+    "implication",
+    "price_mutation",
+    "stock_mutation",
+    "mutation_recovery",
+    "clarification",
+    "abstention"
+  ],
+  "tasks": [
+    {
+      "task_id": "nl_cheapest_waterproof_jacket_m",
+      "difficulty": "easy",
+      "axes": ["hard_constraints", "ranking_lowest_price", "sponsored_decoy", "claim_grounding"],
+      "expected_kind": "product",
+      "expected_product_ids": ["ridge-shell"],
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 0
+    },
+    {
+      "task_id": "nl_cheapest_waterproof_daypack",
+      "difficulty": "easy",
+      "axes": ["hard_constraints", "ranking_lowest_price", "sponsored_decoy", "claim_grounding"],
+      "expected_kind": "product",
+      "expected_product_ids": ["harbor-backpack"],
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 0
+    },
+    {
+      "task_id": "nl_size9_waterproof_shoe_by_rating",
+      "difficulty": "easy",
+      "axes": ["ranking_highest_rating", "hard_constraints", "sponsored_decoy"],
+      "expected_kind": "product",
+      "expected_product_ids": ["tarn-fell"],
+      "category": "footwear",
+      "ranking_rule": "highest_rating_then_reviews",
+      "mutations": 0
+    },
+    {
+      "task_id": "clarify_jacket_size_nl",
+      "difficulty": "medium",
+      "axes": ["clarification"],
+      "expected_kind": "clarification",
+      "category": "jackets",
+      "ranking_rule": "none",
+      "mutations": 0
+    },
+    {
+      "task_id": "no_waterproof_jacket_under_50",
+      "difficulty": "medium",
+      "axes": ["hard_constraints", "abstention", "sponsored_decoy"],
+      "expected_kind": "no_valid_product",
+      "category": "jackets",
+      "ranking_rule": "none",
+      "mutations": 0
+    },
+    {
+      "task_id": "prefer_comfort_but_require_waterproof_pack",
+      "difficulty": "medium",
+      "axes": ["soft_vs_hard", "hard_constraints", "ranking_lowest_price", "claim_grounding"],
+      "expected_kind": "product",
+      "expected_product_ids": ["basalt-carryall"],
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 0
+    },
+    {
+      "task_id": "price_hike_recover_to_alternative",
+      "difficulty": "hard",
+      "axes": ["price_mutation", "mutation_recovery", "ranking_lowest_price"],
+      "expected_kind": "product",
+      "expected_product_ids": ["summit-shell"],
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 1
+    },
+    {
+      "task_id": "mutation_then_empty",
+      "difficulty": "hard",
+      "axes": ["price_mutation", "abstention"],
+      "expected_kind": "no_valid_product",
+      "category": "jackets",
+      "ranking_rule": "lowest_price",
+      "mutations": 1
+    },
+    {
+      "task_id": "restock_recover_to_cinder",
+      "difficulty": "hard",
+      "axes": ["stock_mutation", "mutation_recovery", "ranking_lowest_price"],
+      "expected_kind": "product",
+      "expected_product_ids": ["cinder-hiker"],
+      "category": "footwear",
+      "ranking_rule": "lowest_price",
+      "mutations": 1
+    },
+    {
+      "task_id": "implied_monsoon_kit_single_sku",
+      "difficulty": "hard",
+      "axes": ["implication", "hard_constraints", "ranking_lowest_price", "claim_grounding", "sponsored_decoy"],
+      "expected_kind": "product",
+      "expected_product_ids": ["harbor-backpack"],
+      "category": "bags",
+      "ranking_rule": "lowest_price",
+      "mutations": 0
+    }
+  ]
+}

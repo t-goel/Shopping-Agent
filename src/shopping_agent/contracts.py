@@ -122,14 +122,28 @@ class TaskDefinition(Contract):
     version: str = Field(min_length=1)
     catalog_version: str = Field(min_length=1)
     difficulty: Literal["easy", "medium", "hard"]
+    agent_surface: Literal["structured", "nl"] = "structured"
     request: ShoppingRequest
-    ranking_rule: Literal["lowest_price", "highest_rating", "none"]
+    ranking_rule: Literal[
+        "lowest_price", "highest_rating", "highest_rating_then_reviews", "none"
+    ]
     expected: ExpectedOutcome
     mutations: list[Mutation] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def clarification_matches_request(self):
-        if (self.expected.kind == "clarification") != bool(self.request.clarification_needed):
+        planted = bool(self.request.clarification_needed)
+        wants_clarify = self.expected.kind == "clarification"
+
+        if self.agent_surface == "nl":
+            # NL surface: never plant the question string; scoring uses question_contains.
+            if planted:
+                raise ValueError("nl surface must not plant clarification_needed")
+            if wants_clarify and not self.expected.question_contains:
+                raise ValueError("nl clarification needs question_contains")
+            return self
+
+        if wants_clarify != planted:
             raise ValueError("clarification outcome and request must agree")
 
         return self

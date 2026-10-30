@@ -1,0 +1,39 @@
+{
+  "task_id": "no_waterproof_under_50",
+  "version": "example-v1",
+  "catalog_version": "catalog-v2",
+  "difficulty": "medium",
+  "agent_surface": "structured",
+  "request": {
+    "original_text": "Find a waterproof jacket under $50.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets",
+        "hard": true
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true,
+        "hard": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 50,
+        "hard": true
+      }
+    ],
+    "preferences": [],
+    "clarification_needed": null
+  },
+  "ranking_rule": "none",
+  "expected": {
+    "kind": "no_valid_product",
+    "valid_product_ids": [],
+    "question_contains": null
+  },
+  "mutations": []
+}

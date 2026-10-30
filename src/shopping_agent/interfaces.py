@@ -16,7 +16,9 @@ Termination = Literal[
 
 class AgentInput(Contract):
     request: ShoppingRequest
-    ranking_rule: Literal["lowest_price", "highest_rating", "none"]
+    ranking_rule: Literal[
+        "lowest_price", "highest_rating", "highest_rating_then_reviews", "none"
+    ] | None = None
 
 
 class Claim(Contract):
