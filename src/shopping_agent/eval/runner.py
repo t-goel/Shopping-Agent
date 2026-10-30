@@ -1,6 +1,8 @@
 """Sequential, process-isolated trials with private store setup and scoring."""
 
 import hashlib
+import os
+import subprocess
 import multiprocessing
 import platform
 import random
@@ -53,20 +55,32 @@ def load_store_modules():
     return create_app, Store, load_examples
 
 
+def agent_metadata(agent):
+    selected, name = select_agent(agent)
+    return {"agent_name": name, "model_id": getattr(selected, "model", None),
+            "prompt_version": getattr(selected, "prompt_version", None)}
+
+
 def metadata(max_calls: int, seconds: float) -> dict:
     source = hashlib.sha256()
     for path in sorted((ROOT / "src").rglob("*.py")):
         source.update(str(path.relative_to(ROOT)).encode())
         source.update(path.read_bytes())
 
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = None
     return {
+        "git_commit": commit,
         "source_sha256": source.hexdigest(),
-        "runner_version": "pilot-v1",
+        "runner_version": "evaluation-v2",
         "baseline_version": "rules-v1",
         "max_tool_calls": max_calls,
         "timeout_seconds": seconds,
         "python": platform.python_version(),
-        "packages": {name: version(name) for name in ("fastapi", "pydantic", "httpx")},
+        "packages": {name: version(name) for name in ("fastapi", "pydantic", "httpx", "requests", "starlette")},
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -75,7 +89,7 @@ def select_agent(agent=None, agent_name: str = "rules"):
     if agent is not None:
         if isinstance(agent, RulesAgent):
             return agent, "rules"
-        return agent, "claude"
+        return agent, "claude" if isinstance(agent, ClaudeAgent) else type(agent).__name__
     if agent_name == "claude":
         return ClaudeAgent(), "claude"
     if agent_name == "rules":
@@ -83,14 +97,34 @@ def select_agent(agent=None, agent_name: str = "rules"):
     raise ValueError("agent_name must be rules or claude")
 
 
+def claude_credentials_available(agent=None) -> bool:
+    """Honor Agent(api_key=...), not only the process environment."""
+    if agent is not None and isinstance(agent, ClaudeAgent):
+        return bool(getattr(agent, "api_key", None))
+    if agent is not None:
+        # Custom agents may carry their own key; env is the fallback for named Claude.
+        return True
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+def validate_experiment(task: TaskDefinition | None = None, tasks: dict[str, TaskDefinition] | None = None,
+                        agent=None, agent_name: str = "rules"):
+    """Reject incompatible agent/surface/credentials before a trial writes output."""
+    selected, name = select_agent(agent, agent_name)
+    surface_tasks = list(tasks.values()) if tasks is not None else ([task] if task is not None else [])
+    if name == "rules" and any(t.agent_surface == "nl" for t in surface_tasks):
+        raise ValueError("Rules agent requires structured tasks; use --tasks data/tasks/harness or --agent claude.")
+    if name == "claude" and not claude_credentials_available(selected):
+        raise ValueError("ANTHROPIC_API_KEY is required for a live Claude benchmark; no trials were run.")
+    return selected, name
+
+
 def failure_record(task, trial_number, reason, duration, trace, error, config) -> TrialResult:
     return TrialResult(
         task_id=task.task_id,
         task_version=task.version,
         catalog_version=task.catalog_version,
-        agent_name="rules",
-        model_id=None,
-        prompt_version=None,
+        **config["agent"],
         trial_number=trial_number,
         mode="api",
         selected_product_ids=[],
@@ -125,8 +159,11 @@ def run_trial(
     store = Store(catalog, {task.task_id: task})
     store.reset(task.task_id)
     config = metadata(max_calls, seconds)
-
-    selected_agent, agent_name = select_agent(agent)
+    selected_agent, agent_name = validate_experiment(task=task, agent=agent)
+    config["agent"] = agent_metadata(selected_agent)
+    config["agent_surface"] = task.agent_surface
+    config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
+    config["catalog_sha256"] = hashlib.sha256(catalog.model_dump_json().encode()).hexdigest()
 
     with TestClient(create_app(store)) as client:
         tools = BudgetedTools(
@@ -161,9 +198,9 @@ def run_trial(
             task_id=task.task_id,
             task_version=task.version,
             catalog_version=task.catalog_version,
-            agent_name=agent_name,
-            model_id=None,
-            prompt_version=None,
+            **agent_metadata(selected_agent),
+            input_tokens=getattr(selected_agent, "input_tokens", None),
+            output_tokens=getattr(selected_agent, "output_tokens", None),
             trial_number=trial_number,
             mode="api",
             selected_product_ids=output.selected_product_ids,
@@ -217,13 +254,18 @@ def isolated_trial(
     if max_calls < 1 or seconds <= 0:
         raise ValueError("budgets must be positive")
 
+    selected_agent, _ = validate_experiment(task=task, agent=agent)
     context = multiprocessing.get_context("spawn")
     receive, send = context.Pipe(duplex=False)
     process = context.Process(
         target=_worker,
-        args=(send, catalog, task, trial_number, max_calls, seconds, agent),
+        args=(send, catalog, task, trial_number, max_calls, seconds, selected_agent),
     )
     config = metadata(max_calls, seconds)
+    config["agent"] = agent_metadata(selected_agent)
+    config["agent_surface"] = task.agent_surface
+    config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
+    config["catalog_sha256"] = hashlib.sha256(catalog.model_dump_json().encode()).hexdigest()
     process.start()
     send.close()
 
@@ -307,6 +349,7 @@ def run_suite(
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
 
+    validate_experiment(tasks=tasks, agent_name=agent_name)
     output.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     results: list[TrialResult] = []

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from shopping_agent.eval.report import (
+    markdown_report,
     print_run_summary,
     print_trial_line,
     read_records,
@@ -43,6 +44,7 @@ def main(argv=None):
     report = commands.add_parser("report")
     report.add_argument("input", type=Path)
     report.add_argument("--json", action="store_true", help="Emit machine-readable JSON summary")
+    report.add_argument("--markdown", action="store_true", help="Print per-task evidence and failure categories")
     args = parser.parse_args(argv)
     if args.command == "run":
         _, _, load_examples = load_store_modules()
@@ -55,7 +57,9 @@ def main(argv=None):
     else:
         records = read_records(args.input)
 
-    if args.json:
+    if getattr(args, "markdown", False):
+        print(markdown_report(records))
+    elif args.json:
         print(json.dumps(summarize(records), indent=2))
     elif args.command == "run":
         print_run_summary(records, include_trials=False)
