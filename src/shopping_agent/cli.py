@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
+from shopping_agent.eval.audit import audit_path
 from shopping_agent.eval.report import (
     markdown_report,
     print_run_summary,
@@ -45,7 +46,14 @@ def main(argv=None):
     report.add_argument("input", type=Path)
     report.add_argument("--json", action="store_true", help="Emit machine-readable JSON summary")
     report.add_argument("--markdown", action="store_true", help="Print per-task evidence and failure categories")
+    audit = commands.add_parser("audit", help="Read-only claim/cart audit of saved trial JSONL")
+    audit.add_argument("input", type=Path, help="Saved trial JSONL; no API key needed")
     args = parser.parse_args(argv)
+
+    if args.command == "audit":
+        print(json.dumps(audit_path(args.input), indent=2, ensure_ascii=True))
+        return 0
+
     if args.command == "run":
         _, _, load_examples = load_store_modules()
         catalog, tasks = load_examples(args.catalog, args.tasks)

@@ -29,12 +29,11 @@ The current group update attributes agent reliability and benchmark runs to Tim,
 From the repository root, after installing requirements-dev.txt:
 
 ```powershell
-$env:PYTHONPATH = 'src'
-.venv/Scripts/python.exe -m shopping_agent.eval.audit path/to/trials.jsonl
-.venv/Scripts/python.exe -m pytest -q
+py eval.py audit path/to/trials.jsonl
+py -m pytest -q
 ```
 
-The command prints JSON and never modifies its input. It needs no API key and makes no model calls. Each report includes the input file's SHA-256 digest. The module works independently of PR #14.
+The command prints JSON and never modifies its input. It needs no API key and makes no model calls. Each report includes the input file's SHA-256 digest. After `py -m pip install -e .`, `shopping-agent audit` works the same way.
 
 ## Verified evidence
 

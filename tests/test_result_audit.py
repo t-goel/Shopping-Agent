@@ -46,6 +46,18 @@ def test_cart_mismatch_and_quantity_are_detected(completed):
     assert result["recorded_cart_consistency"] == "mismatch"
 
 
+def test_selection_cart_uses_quantity_not_row_count(completed):
+    # One cart row with quantity 2 must not look consistent with a single selected id.
+    completed.final_state["cart"]["items"] = [
+        {"product_id": "ridge-shell", "quantity": 2, "unit_price": 89}
+    ]
+    completed.selected_product_ids = ["ridge-shell"]
+    completed.cart_items[0].quantity = 2
+    result = audit_trial(completed)
+    assert result["selection_cart_consistency"] == "mismatch"
+    assert result["recorded_cart_consistency"] == "consistent"
+
+
 @pytest.mark.parametrize("snapshot", [None, {}, {"cart": {"items": None}}, {"cart": {"items": [{}]}}])
 def test_missing_or_malformed_snapshot_is_not_a_pass(completed, snapshot):
     completed.final_state = snapshot
@@ -85,6 +97,24 @@ def test_off_cart_mentions_are_only_review_flags(completed):
     assert audit_trial(completed)["response_title_review"] == []
 
 
+def test_title_review_covers_non_completed_trials(completed):
+    title = completed.final_state["products"]["summit-shell"]["title"]
+    completed.termination_reason = "clarification_needed"
+    completed.selected_product_ids = []
+    completed.final_state["cart"]["items"] = []
+    completed.cart_items = []
+    completed.response_text = f"What size? You might like the {title}."
+    result = audit_trial(completed)
+    assert result["response_title_review"] == [{"product_id": "summit-shell", "title": title}]
+
+
+def test_audit_records_includes_input_digest(completed):
+    raw = (completed.model_dump_json() + "\n").encode()
+    report = audit_records([completed], input_bytes=raw)
+    assert report["input_sha256"] == __import__("hashlib").sha256(raw).hexdigest()
+    assert "input_sha256" not in audit_records([completed])
+
+
 def test_cli_audits_utf8_without_api_key_and_preserves_file(completed, tmp_path):
     path = tmp_path / "trials.jsonl"
     completed.response_text = "Rain jacket — selected."
@@ -92,9 +122,11 @@ def test_cli_audits_utf8_without_api_key_and_preserves_file(completed, tmp_path)
     before = path.read_bytes()
     env = dict(os.environ)
     env.pop("ANTHROPIC_API_KEY", None)
-    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
-    run = subprocess.run([sys.executable, "-m", "shopping_agent.eval.audit", str(path)],
-                         capture_output=True, text=True, env=env, timeout=20)
+    root = Path(__file__).resolve().parents[1]
+    run = subprocess.run(
+        [sys.executable, str(root / "eval.py"), "audit", str(path)],
+        capture_output=True, text=True, env=env, timeout=20, cwd=root,
+    )
     assert run.returncode == 0, run.stderr
     report = json.loads(run.stdout)
     assert len(report["input_sha256"]) == 64
