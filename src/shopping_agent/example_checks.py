@@ -1,6 +1,6 @@
 """Authoring checks for benchmark examples; these are never exposed to the agent."""
 
-from shopping_agent.contracts import CatalogExample, TaskDefinition
+from shopping_agent.contracts import CatalogExample, Product, TaskDefinition
 
 
 from shopping_agent.comparison import matches

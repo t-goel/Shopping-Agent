@@ -56,7 +56,7 @@ def test_invalid_inputs_and_oracle_state():
         assert api.get("/api/products", params={"limit": 0}).status_code == 422
         assert api.post("/api/cart", json={"product_id": "ridge-shell", "quantity": 0}).status_code == 422
 
-        assert api.get("/internal/state").json()["catalog_version"] == "catalog-v1"
+        assert api.get("/internal/state").json()["catalog_version"] == "catalog-v2"
 
 
 def test_empty_search_and_stock_mutation_reject_stale_cart():

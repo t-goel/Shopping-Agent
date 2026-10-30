@@ -11,7 +11,7 @@ from server.state import load_examples
 def test_examples_load_and_reference_a_known_catalog():
     catalog, tasks = load_examples()
 
-    assert len(catalog.products) == 6
+    assert len(catalog.products) == 20
     assert set(tasks) == {
         "cheapest_waterproof_jacket", "no_waterproof_under_50", "price_change",
         "clarify_jacket_size", "stock_change",
