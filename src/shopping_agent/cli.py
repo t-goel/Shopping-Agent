@@ -47,17 +47,10 @@ def main(argv=None):
     if args.command == "run":
         _, _, load_examples = load_store_modules()
         catalog, tasks = load_examples(args.catalog, args.tasks)
-        on_result = None if args.json else print_trial_line
         records = run_suite(
-            catalog,
-            tasks,
-            args.output,
-            args.repetitions,
-            args.seed,
-            args.max_calls,
-            args.timeout,
-            args.agent,
-            on_result=on_result,
+            catalog, tasks, args.output, args.repetitions, args.seed,
+            args.max_calls, args.timeout, args.agent,
+            on_result=None if args.json else print_trial_line,
         )
     else:
         records = read_records(args.input)
