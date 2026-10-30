@@ -1,0 +1,254 @@
+{
+  "audit_version": "final-state-v1",
+  "summary": {
+    "trials": 15,
+    "selection_cart_consistency": {
+      "consistent": 15
+    },
+    "recorded_cart_consistency": {
+      "consistent": 15
+    },
+    "structured_claims": {
+      "supports": 6,
+      "contradicts": 0,
+      "unknown": 0,
+      "invalid": 0
+    },
+    "assessable_claims": 6,
+    "structured_claim_contradiction_rate": 0.0,
+    "trials_with_claims": 3,
+    "response_title_review_trials": 0
+  },
+  "limitations": [
+    "This audit does not change benchmark success or compare agent performance.",
+    "Claim checks cover only declared scalar facts, evaluated at final-state time.",
+    "Missing facts/snapshots are unassessable; absent claims are not verified prose.",
+    "Exact off-cart title mentions require human review; alternatives and negation can be legitimate.",
+    "No title flags does not prove prose consistency; aliases and implicit references are not parsed."
+  ],
+  "trials": [
+    {
+      "task_id": "clarify_jacket_size",
+      "trial_number": 1,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "cheapest_waterproof_jacket",
+      "trial_number": 1,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [
+        {
+          "index": 0,
+          "status": "supports",
+          "observed_value": "Ridge Rain Shell",
+          "claim_id": "ridge-shell:title",
+          "product_id": "ridge-shell",
+          "field": "title",
+          "claimed_value": "Ridge Rain Shell"
+        },
+        {
+          "index": 1,
+          "status": "supports",
+          "observed_value": 89.0,
+          "claim_id": "ridge-shell:price",
+          "product_id": "ridge-shell",
+          "field": "price",
+          "claimed_value": 89.0
+        }
+      ],
+      "response_title_review": []
+    },
+    {
+      "task_id": "no_waterproof_under_50",
+      "trial_number": 1,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "stock_change",
+      "trial_number": 1,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "price_change",
+      "trial_number": 1,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "price_change",
+      "trial_number": 2,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "cheapest_waterproof_jacket",
+      "trial_number": 2,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [
+        {
+          "index": 0,
+          "status": "supports",
+          "observed_value": "Ridge Rain Shell",
+          "claim_id": "ridge-shell:title",
+          "product_id": "ridge-shell",
+          "field": "title",
+          "claimed_value": "Ridge Rain Shell"
+        },
+        {
+          "index": 1,
+          "status": "supports",
+          "observed_value": 89.0,
+          "claim_id": "ridge-shell:price",
+          "product_id": "ridge-shell",
+          "field": "price",
+          "claimed_value": 89.0
+        }
+      ],
+      "response_title_review": []
+    },
+    {
+      "task_id": "stock_change",
+      "trial_number": 2,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "no_waterproof_under_50",
+      "trial_number": 2,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "clarify_jacket_size",
+      "trial_number": 2,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "cheapest_waterproof_jacket",
+      "trial_number": 3,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [
+        {
+          "index": 0,
+          "status": "supports",
+          "observed_value": "Ridge Rain Shell",
+          "claim_id": "ridge-shell:title",
+          "product_id": "ridge-shell",
+          "field": "title",
+          "claimed_value": "Ridge Rain Shell"
+        },
+        {
+          "index": 1,
+          "status": "supports",
+          "observed_value": 89.0,
+          "claim_id": "ridge-shell:price",
+          "product_id": "ridge-shell",
+          "field": "price",
+          "claimed_value": 89.0
+        }
+      ],
+      "response_title_review": []
+    },
+    {
+      "task_id": "clarify_jacket_size",
+      "trial_number": 3,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "no_waterproof_under_50",
+      "trial_number": 3,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "price_change",
+      "trial_number": 3,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    },
+    {
+      "task_id": "stock_change",
+      "trial_number": 3,
+      "agent_name": "rules",
+      "model_id": null,
+      "original_success": true,
+      "selection_cart_consistency": "consistent",
+      "recorded_cart_consistency": "consistent",
+      "claims": [],
+      "response_title_review": []
+    }
+  ],
+  "input_sha256": "2280f39afe29a4aae967061433895fc53f323e7ee58d1ddda621368aefd1d9b5"
+}
