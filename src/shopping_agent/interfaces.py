@@ -34,6 +34,7 @@ class AgentOutput(Contract):
     claims: list[Claim] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     termination_reason: Termination
+    diagnostics: dict = Field(default_factory=dict)
 
 
 class CartItemObservation(CartSelection):
