@@ -27,7 +27,7 @@ def positive_seconds(value):
     return number
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Deterministic mock-store evaluation pilot")
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
@@ -43,7 +43,7 @@ def main():
     report = commands.add_parser("report")
     report.add_argument("input", type=Path)
     report.add_argument("--json", action="store_true", help="Emit machine-readable JSON summary")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.command == "run":
         _, _, load_examples = load_store_modules()
         catalog, tasks = load_examples(args.catalog, args.tasks)
@@ -68,7 +68,8 @@ def main():
         print_run_summary(records, include_trials=False)
     else:
         print_run_summary(records)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

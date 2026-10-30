@@ -12,6 +12,9 @@ dependencies = ["fastapi>=0.115,<1", "pydantic>=2.10,<3", "uvicorn>=0.34,<1", "h
 [project.optional-dependencies]
 dev = ["httpx>=0.28,<1", "pytest>=8,<10"]
 
+[project.scripts]
+shopping-agent = "shopping_agent.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/shopping_agent"]
 
