@@ -213,6 +213,7 @@ class TrialResult(Contract):
     tool_trace: list[dict] = Field(default_factory=list)
     final_state: dict | None = None
     error: str | None = None
+    agent_diagnostics: dict = Field(default_factory=dict)
     run_metadata: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")

@@ -222,6 +222,7 @@ def run_trial(
             tool_trace=[event.model_dump(mode="json") for event in tools.trace],
             final_state=snapshot,
             error=error,
+            agent_diagnostics=output.diagnostics,
             run_metadata=config,
         )
 

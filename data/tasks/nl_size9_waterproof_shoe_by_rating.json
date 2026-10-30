@@ -5,7 +5,7 @@
   "difficulty": "easy",
   "agent_surface": "nl",
   "request": {
-    "original_text": "Waterproof hiking shoes, men's US 9, still in stock. If several qualify, pick the one shoppers rate highest on average.",
+    "original_text": "Waterproof hiking shoes, men's US 9, still in stock. If several qualify, pick the one shoppers rate highest on average. If their averages tie, prefer the one with more reviews.",
     "constraints": [
       {
         "attribute": "category",

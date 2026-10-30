@@ -65,6 +65,12 @@ def test_clarify_tasks_have_no_planted_cue(task_id, needle):
     assert task.expected.question_contains == needle
 
 
+def test_rating_tie_break_is_stated_in_shopper_request():
+    _, tasks = load_examples()
+    request = tasks["nl_size9_waterproof_shoe_by_rating"].request.original_text.casefold()
+    assert "tie" in request and "more reviews" in request
+
+
 @pytest.mark.parametrize("task_id", sorted(SUITE_IDS))
 def test_every_scored_agent_input_is_nl_only(task_id):
     _, tasks = load_examples()
