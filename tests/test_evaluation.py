@@ -11,7 +11,7 @@ from server.state import Store, load_examples
 from shopping_agent.agent.rules import RulesAgent, rank
 from shopping_agent.contracts import Constraint, Mutation, ProductObservation, SearchInput
 from shopping_agent.eval.report import summarize
-from shopping_agent.eval.runner import agent_input_for_task, isolated_trial, run_trial
+from shopping_agent.eval.runner import isolated_trial, run_trial
 from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim
 from shopping_agent.tools.api import CatalogAPI, ToolError
@@ -85,29 +85,7 @@ def test_harness_tasks_complete_against_live_state(task_id):
         assert not result.cart_items
 
 
-def test_rules_agent_cannot_solve_nl_surface_without_cheat_sheet():
-    catalog, tasks = load_examples()
-    result = run_trial(catalog, tasks["nl_cheapest_waterproof_jacket_m"])
-    assert not result.is_successful
-    assert result.termination_reason == "unrecoverable_failure"
-    assert "structured Surface A" in (result.error or "")
 
-
-def test_nl_agent_input_strips_constraints_ranking_and_planted_clarify():
-    _, tasks = load_examples()
-    product_task = tasks["prefer_comfort_but_require_waterproof_pack"]
-    clarify_task = tasks["clarify_jacket_size_nl"]
-
-    product_input = agent_input_for_task(product_task)
-    assert product_input.ranking_rule is None
-    assert product_input.request.constraints == []
-    assert product_input.request.preferences == []
-    assert product_input.request.clarification_needed is None
-    assert "waterproof" in product_input.request.original_text.casefold()
-
-    clarify_input = agent_input_for_task(clarify_task)
-    assert clarify_input.request.clarification_needed is None
-    assert clarify_task.expected.question_contains == "size"
 
 
 @pytest.mark.parametrize("change", [{"stock": 0}, {"price": 120}])

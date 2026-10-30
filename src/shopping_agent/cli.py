@@ -31,7 +31,7 @@ def main():
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--repetitions", type=positive_int, default=3)
     run.add_argument("--seed", type=int, default=498)
-    run.add_argument("--max-calls", type=positive_int, default=20)
+    run.add_argument("--max-calls", type=positive_int, default=10)
     run.add_argument("--timeout", type=positive_seconds, default=60)
     run.add_argument("--agent", choices=("rules", "claude"), default="rules")
     report = commands.add_parser("report")

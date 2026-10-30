@@ -26,7 +26,7 @@ class BudgetedTools:
     def __init__(
         self,
         tools: ShoppingTools,
-        max_calls: int = 20,
+        max_calls: int = 10,
         seconds: float = 60,
         clock: Callable = monotonic,
         on_trace: Callable | None = None,

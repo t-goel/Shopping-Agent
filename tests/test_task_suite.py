@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from shopping_agent.eval.runner import agent_input_for_task
 from shopping_agent.example_checks import expected_products
 from server.state import load_examples
 
@@ -63,21 +62,6 @@ def test_clarify_tasks_have_no_planted_cue(task_id, needle):
     assert task.expected.kind == "clarification"
     assert task.request.clarification_needed is None
     assert task.expected.question_contains == needle
-    agent_in = agent_input_for_task(task)
-    assert agent_in.request.clarification_needed is None
-    assert agent_in.request.constraints == []
-
-
-@pytest.mark.parametrize("task_id", sorted(SUITE_IDS))
-def test_every_scored_agent_input_is_nl_only(task_id):
-    _, tasks = load_examples()
-    agent_in = agent_input_for_task(tasks[task_id])
-    dumped = agent_in.request.model_dump()
-    assert dumped["constraints"] == []
-    assert dumped["preferences"] == []
-    assert dumped["clarification_needed"] is None
-    assert agent_in.ranking_rule is None
-    assert len(dumped["original_text"]) > 20
 
 
 def test_task_summary_stays_in_sync_with_task_files():

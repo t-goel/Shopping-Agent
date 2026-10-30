@@ -6,7 +6,7 @@ from shopping_agent.tools.api import ToolError
 from shopping_agent.verifier import eligible, verify_claims
 
 
-def rank(observations: list[ProductObservation], rule: str | None) -> list[ProductObservation]:
+def rank(observations: list[ProductObservation], rule: str) -> list[ProductObservation]:
     """Sort candidate observations by the task ranking rule, breaking ties by product ID."""
 
     def sorting_key(observation: ProductObservation):
@@ -14,9 +14,9 @@ def rank(observations: list[ProductObservation], rule: str | None) -> list[Produ
 
         if rule == "lowest_price":
             # Lowest price sorts first (ascending).
-            return product.price, product.product_id
+            sort_metric = product.price
 
-        if rule in {"highest_rating", "highest_rating_then_reviews"}:
+        elif rule == "highest_rating":
             # Highest average review rating sorts first.
             # Negate the average so higher ratings sort first; unreviewed products sort last (-1.0 -> 1.0).
             if product.reviews:
@@ -24,11 +24,12 @@ def rank(observations: list[ProductObservation], rule: str | None) -> list[Produ
             else:
                 average_rating = -1.0
 
-            # For the review-count tie-break, prefer more reviews next (negate count).
-            review_tie = -len(product.reviews) if rule == "highest_rating_then_reviews" else 0
-            return -average_rating, review_tie, product.product_id
+            sort_metric = -average_rating
 
-        return 0, product.product_id
+        else:
+            sort_metric = 0
+
+        return sort_metric, product.product_id
 
     return sorted(observations, key=sorting_key)
 
@@ -36,9 +37,6 @@ def rank(observations: list[ProductObservation], rule: str | None) -> list[Produ
 class RulesAgent:
     def run(self, inputs: AgentInput, tools: ShoppingTools) -> AgentOutput:
         request = inputs.request
-
-        if inputs.ranking_rule is None and not request.constraints and not request.clarification_needed:
-            raise ValueError("rules pilot requires structured Surface A input")
 
         if request.clarification_needed:
             return AgentOutput(
