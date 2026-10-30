@@ -1,0 +1,44 @@
+{
+  "task_id": "mutation_then_empty",
+  "version": "suite-v4",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Waterproof medium jacket, max $100\u2014cheapest wins.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "M"
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "no_valid_product"
+  },
+  "mutations": [
+    {
+      "after_observations": 1,
+      "product_id": "ridge-shell",
+      "price": 109.0
+    }
+  ]
+}

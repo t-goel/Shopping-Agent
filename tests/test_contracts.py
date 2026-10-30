@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -7,17 +8,34 @@ from shopping_agent.contracts import CatalogExample, Constraint, ExpectedOutcome
 from shopping_agent.example_checks import matches
 from server.state import load_examples
 
+ROOT_TASKS = Path(__file__).resolve().parents[1] / "data" / "tasks"
+HARNESS_TASKS = ROOT_TASKS / "harness"
+
 
 def test_examples_load_and_reference_a_known_catalog():
     catalog, tasks = load_examples()
 
     assert len(catalog.products) == 20
-    assert set(tasks) == {
-        "cheapest_waterproof_jacket", "no_waterproof_under_50", "price_change",
-        "clarify_jacket_size", "stock_change",
-    }
-
+    assert len(tasks) == 10
     assert all(task.catalog_version == catalog.version for task in tasks.values())
+    assert all(task.agent_surface == "nl" for task in tasks.values())
+    assert all(task.version == "suite-v4" for task in tasks.values())
+    assert sum(task.difficulty == "easy" for task in tasks.values()) == 3
+    assert sum(task.difficulty == "medium" for task in tasks.values()) == 3
+    assert sum(task.difficulty == "hard" for task in tasks.values()) == 4
+
+
+def test_harness_surface_a_still_loads():
+    catalog, tasks = load_examples(tasks_path=HARNESS_TASKS)
+    assert set(tasks) == {
+        "cheapest_waterproof_jacket",
+        "no_waterproof_under_50",
+        "price_change",
+        "clarify_jacket_size",
+        "stock_change",
+    }
+    assert all(task.agent_surface == "structured" for task in tasks.values())
+    assert catalog.version == "catalog-v2"
 
 
 def test_catalog_rejects_duplicate_ids():
@@ -65,9 +83,18 @@ def test_loader_rejects_wrong_expected_answer(tmp_path):
     tasks_path = tmp_path / "tasks"
     tasks_path.mkdir()
     catalog_path.write_text(catalog.model_dump_json())
-    task = tasks["cheapest_waterproof_jacket"].model_dump(mode="json")
+    task = tasks["nl_cheapest_waterproof_jacket_m"].model_dump(mode="json")
     task["expected"]["valid_product_ids"] = ["city-windbreaker"]
     (tasks_path / "wrong.json").write_text(json.dumps(task))
 
     with pytest.raises(ValueError, match="computed"):
         load_examples(catalog_path, tasks_path)
+
+
+def test_nl_surface_forbids_planted_clarification():
+    catalog, tasks = load_examples()
+    task = tasks["clarify_jacket_size_nl"].model_dump(mode="json")
+    task["request"]["clarification_needed"] = "What size?"
+    with pytest.raises(ValidationError, match="plant"):
+        from shopping_agent.contracts import TaskDefinition
+        TaskDefinition.model_validate(task)

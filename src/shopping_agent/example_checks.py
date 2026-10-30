@@ -34,7 +34,7 @@ def expected_products(catalog: CatalogExample, task: TaskDefinition) -> set[str]
         best = min(product.price for product in candidates)
         candidates = [product for product in candidates if product.price == best]
 
-    elif task.ranking_rule == "highest_rating":
+    elif task.ranking_rule in {"highest_rating", "highest_rating_then_reviews"}:
         def rating(product: Product) -> float:
             if not product.reviews:
                 return -1
@@ -43,5 +43,11 @@ def expected_products(catalog: CatalogExample, task: TaskDefinition) -> set[str]
 
         best = max(rating(product) for product in candidates)
         candidates = [product for product in candidates if rating(product) == best]
+
+        if task.ranking_rule == "highest_rating_then_reviews" and len(candidates) > 1:
+            most_reviews = max(len(product.reviews) for product in candidates)
+            candidates = [
+                product for product in candidates if len(product.reviews) == most_reviews
+            ]
 
     return {product.product_id for product in candidates}

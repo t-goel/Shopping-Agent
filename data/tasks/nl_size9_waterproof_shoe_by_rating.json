@@ -1,0 +1,35 @@
+{
+  "task_id": "nl_size9_waterproof_shoe_by_rating",
+  "version": "suite-v4",
+  "catalog_version": "catalog-v2",
+  "difficulty": "easy",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "Waterproof hiking shoes, men's US 9, still in stock. If several qualify, pick the one shoppers rate highest on average.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9"
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "highest_rating_then_reviews",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "tarn-fell"
+    ]
+  }
+}

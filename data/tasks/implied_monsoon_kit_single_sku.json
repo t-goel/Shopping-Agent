@@ -1,0 +1,45 @@
+{
+  "task_id": "implied_monsoon_kit_single_sku",
+  "version": "suite-v4",
+  "catalog_version": "catalog-v2",
+  "difficulty": "hard",
+  "agent_surface": "nl",
+  "request": {
+    "original_text": "One-day hike tomorrow in monsoon weather. Rain jacket is already packed. I need one bag that keeps a laptop and a couple layers dry while I'm out\u2014daypack sized, not expedition. Try to stay under $70.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags"
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "gte",
+        "value": 20
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 25
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 70
+      }
+    ],
+    "preferences": []
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "harbor-backpack"
+    ]
+  }
+}

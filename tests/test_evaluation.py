@@ -1,6 +1,7 @@
 import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,12 +11,18 @@ from server.state import Store, load_examples
 from shopping_agent.agent.rules import RulesAgent, rank
 from shopping_agent.contracts import Constraint, Mutation, ProductObservation, SearchInput
 from shopping_agent.eval.report import summarize
-from shopping_agent.eval.runner import isolated_trial, run_trial
+from shopping_agent.eval.runner import agent_input_for_task, isolated_trial, run_trial
 from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim
 from shopping_agent.tools.api import CatalogAPI, ToolError
 from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded
 from shopping_agent.verifier import check_constraints, verify_claims
+
+HARNESS = Path(__file__).resolve().parents[1] / "data" / "tasks" / "harness"
+
+
+def harness_examples():
+    return load_examples(tasks_path=HARNESS)
 
 
 def observation(product):
@@ -51,12 +58,19 @@ def test_ranking_ties_ratings_and_no_reviews():
     assert rank([observation(catalog.products[4]), observation(a)], "highest_rating")[0].product == a
 
 
+def test_rating_then_reviews_breaks_average_ties():
+    catalog, tasks = load_examples()
+    task = tasks["nl_size9_waterproof_shoe_by_rating"]
+    from shopping_agent.example_checks import expected_products
+    assert expected_products(catalog, task) == {"tarn-fell"}
+
+
 @pytest.mark.parametrize("task_id", [
     "cheapest_waterproof_jacket", "clarify_jacket_size", "no_waterproof_under_50",
     "price_change", "stock_change",
 ])
-def test_existing_tasks_complete_against_live_state(task_id):
-    catalog, tasks = load_examples()
+def test_harness_tasks_complete_against_live_state(task_id):
+    catalog, tasks = harness_examples()
     result = run_trial(catalog, tasks[task_id])
     assert result.is_successful, result.model_dump()
     assert result.tool_calls <= 10
@@ -71,9 +85,34 @@ def test_existing_tasks_complete_against_live_state(task_id):
         assert not result.cart_items
 
 
+def test_rules_agent_cannot_solve_nl_surface_without_cheat_sheet():
+    catalog, tasks = load_examples()
+    result = run_trial(catalog, tasks["nl_cheapest_waterproof_jacket_m"])
+    assert not result.is_successful
+    assert result.termination_reason == "unrecoverable_failure"
+    assert "structured Surface A" in (result.error or "")
+
+
+def test_nl_agent_input_strips_constraints_ranking_and_planted_clarify():
+    _, tasks = load_examples()
+    product_task = tasks["prefer_comfort_but_require_waterproof_pack"]
+    clarify_task = tasks["clarify_jacket_size_nl"]
+
+    product_input = agent_input_for_task(product_task)
+    assert product_input.ranking_rule is None
+    assert product_input.request.constraints == []
+    assert product_input.request.preferences == []
+    assert product_input.request.clarification_needed is None
+    assert "waterproof" in product_input.request.original_text.casefold()
+
+    clarify_input = agent_input_for_task(clarify_task)
+    assert clarify_input.request.clarification_needed is None
+    assert clarify_task.expected.question_contains == "size"
+
+
 @pytest.mark.parametrize("change", [{"stock": 0}, {"price": 120}])
 def test_mutation_recovery_selects_valid_replacement(change):
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     catalog = catalog.model_copy(deep=True)
     catalog.products[1].price = 95
     task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
@@ -85,7 +124,7 @@ def test_mutation_recovery_selects_valid_replacement(change):
 
 
 def test_price_drop_can_make_initial_nonmatch_the_winner():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
     task.expected.valid_product_ids = ["summit-shell"]
     task.mutations = [Mutation(after_observations=1, product_id="summit-shell", price=80)]
@@ -95,7 +134,7 @@ def test_price_drop_can_make_initial_nonmatch_the_winner():
 
 
 def test_reset_isolates_cart_and_mutations():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     changed = run_trial(catalog, tasks["price_change"])
     normal = run_trial(catalog, tasks["cheapest_waterproof_jacket"])
     assert changed.final_state["products"]["ridge-shell"]["price"] == 109
@@ -105,7 +144,7 @@ def test_reset_isolates_cart_and_mutations():
 
 
 def test_public_adapter_and_budget_record_http_errors():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     with TestClient(create_app(Store(catalog, tasks))) as client:
         tools = BudgetedTools(CatalogAPI(client), max_calls=1)
         with pytest.raises(ToolError):
@@ -118,7 +157,7 @@ def test_public_adapter_and_budget_record_http_errors():
 
 
 def test_cooperative_timeout_and_failure_denominator():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     result = run_trial(catalog, tasks["cheapest_waterproof_jacket"], max_calls=1)
     assert not result.is_successful
     assert result.termination_reason == "max_tool_calls_exceeded"
@@ -143,7 +182,7 @@ class BlockedAgent:
 
 
 def test_process_deadline_stops_noncooperative_agent():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     start = time.monotonic()
     result = isolated_trial(catalog, tasks["cheapest_waterproof_jacket"], seconds=1, agent=BlockedAgent())
     assert time.monotonic() - start < 10
@@ -161,12 +200,12 @@ class InspectInputAgent:
 
 
 def test_agent_input_contains_no_oracle_or_controls():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     assert run_trial(catalog, tasks["cheapest_waterproof_jacket"], agent=InspectInputAgent()).is_successful
 
 
 def test_scorer_rejects_stale_choice_wrong_cart_and_false_abstention():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     task = tasks["cheapest_waterproof_jacket"]
     store = Store(catalog, tasks)
     store.reset(task.task_id)
@@ -187,11 +226,15 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     import os
     import subprocess
     import sys
-    from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "runs.jsonl"
     env = {**os.environ, "PYTHONPATH": str(root / "src")}
-    command = [sys.executable, "-m", "shopping_agent.cli", "run", "--repetitions", "1", "--output", str(output)]
+    command = [
+        sys.executable, "-m", "shopping_agent.cli", "run",
+        "--repetitions", "1",
+        "--tasks", str(root / "data" / "tasks" / "harness"),
+        "--output", str(output),
+    ]
     completed = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True, timeout=30)
     assert completed.returncode == 0, completed.stderr
     rows = [json.loads(line) for line in output.read_text().splitlines()]
@@ -204,7 +247,7 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
 
 @pytest.mark.parametrize("new_price", [96, 120])
 def test_final_refresh_reranks_late_price_change(new_price):
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     catalog = catalog.model_copy(deep=True)
     catalog.products[1].price = 95
     task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
@@ -219,7 +262,7 @@ def test_final_refresh_reranks_late_price_change(new_price):
 
 
 def test_late_change_can_preserve_the_same_winner():
-    catalog, tasks = load_examples()
+    catalog, tasks = harness_examples()
     task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
     task.mutations = [Mutation(after_observations=6, product_id="ridge-shell", price=90)]
     result = run_trial(catalog, task)
