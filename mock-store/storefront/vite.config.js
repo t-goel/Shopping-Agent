@@ -3,5 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: { proxy: { '/api': 'http://127.0.0.1:8000' } },
+  server: {
+    host: true,
+    // Tailscale MagicDNS / raw IP hosts must be allowed or Vite returns 403.
+    allowedHosts: true,
+    proxy: { '/api': 'http://127.0.0.1:8000' },
+  },
 });
