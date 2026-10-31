@@ -7,10 +7,11 @@ import json
 from pathlib import Path
 
 from shopping_agent.contracts import (
-    AssortmentRow,
+    CatalogExample,
     IngestCatalog,
     IngestProduct,
-    StoreRecord,
+    IngestProvenance,
+    StoresPartition,
 )
 
 
@@ -33,6 +34,72 @@ def validate_ingest(data: dict | IngestCatalog) -> IngestCatalog:
     if isinstance(data, IngestCatalog):
         return data
     return IngestCatalog.model_validate(data)
+
+
+def load_partition(source: Path | str | dict) -> StoresPartition:
+    """Load a stores+assortment overlay (accepts notes/blurb; role is informational)."""
+    if isinstance(source, (str, Path)):
+        path = Path(source)
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            data = json.loads(str(source))
+    else:
+        data = source
+    return StoresPartition.model_validate(data)
+
+
+def merge_partition_with_catalog(
+    partition: StoresPartition | dict | Path | str,
+    catalog: CatalogExample | dict | Path | str,
+) -> IngestCatalog:
+    """Combine catalog-v2 products with a stores partition into a full ingest-v1 catalog."""
+    if not isinstance(partition, StoresPartition):
+        partition = load_partition(partition)
+    if isinstance(catalog, (str, Path)):
+        path = Path(catalog)
+        catalog = CatalogExample.model_validate_json(path.read_text(encoding="utf-8"))
+    elif isinstance(catalog, dict):
+        catalog = CatalogExample.model_validate(catalog)
+
+    product_ids = {p.product_id for p in catalog.products}
+    for row in partition.assortment:
+        if row.product_id not in product_ids:
+            raise ValueError(f"partition references unknown product {row.product_id}")
+
+    # Prefer each product's first assortment store as canonical when building ingest products.
+    first_store: dict[str, str] = {}
+    for row in partition.assortment:
+        first_store.setdefault(row.product_id, row.store_id)
+
+    products = [
+        IngestProduct(
+            product_id=product.product_id,
+            title=product.title,
+            description=product.description,
+            category=product.category,
+            currency=product.currency,
+            canonical_store_id=first_store.get(product.product_id, partition.stores[0].store_id),
+            seller_default=product.seller,
+            attributes=product.attributes,
+            reviews=product.reviews,
+            image_url=product.image_url,
+            provenance=IngestProvenance(
+                method="synthetic",
+                notes="Projected from catalog + stores partition",
+            ),
+        )
+        for product in catalog.products
+        if product.product_id in first_store
+    ]
+    return IngestCatalog(
+        ingest_version="ingest-v1",
+        notes=partition.notes,
+        catalog_bootstrap=partition.catalog_bootstrap or catalog.version,
+        stores=partition.stores,
+        products=products,
+        assortment=partition.assortment,
+    )
 
 
 def _to_raw_dict(ingest: dict | IngestCatalog) -> dict:

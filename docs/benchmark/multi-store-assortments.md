@@ -202,10 +202,9 @@ When multi-store UI densifies after PR #17, aim ~10–15 chrome blocks beyond ti
 - **Store isolation failure:** A stockout or price change targeted at `product_id` either uniformly mutates all stores stocking that SKU (destroying store isolation) or only touches a privileged store. Essential scenarios—such as Trailworks stocking out mid-trial to force the agent to find stock at Summit, or Metrowear running a flash sale—cannot be modeled.
 - **Resolution:** `Mutation` requires an optional `listing_id: str | None = None` (or `store_id: str | None = None`). When specified, only the designated store's assortment row mutates. Unset/null defaults to canonical store or all-store broadcast for legacy `catalog-v2` tasks.
 
-### 4. SearchInput: `store_id` timing (now vs catalog-v3)
-- **Keep SearchInput unchanged for now; add `store_id` in catalog-v3.**
-- `SearchInput` enforces `extra="forbid"`. Adding optional `store_id: str | None = None` now is schema-compatible, but the `mock-store` runtime `/api/products` and `Store.search()` do not accept `store_id`, creating a dead contract surface before runtime support exists.
-- Crucially, multi-mode should **require** `store_id` (store-scoped search) rather than making it optional. An optional `store_id` enables federated search across all stores, eliminating the navigation challenge of discovering and querying specific storefronts. Store-scoping belongs cleanly in the `catalog-v3` / multi-mode release.
+### 4. SearchInput: `store_id` (stores-v1)
+- Optional `SearchInput.store_id` shipped with stores-v1 so `CatalogAPI.search` can hit shared `/api/products?store_id=…`.
+- Multi-store **requires** `store_id` at the API (400 if missing); no federated search. Single-store ignores it.
 
 ### 5. Sibling ingest schema conflict check
 - **No conflict — peer schema already aligned.**

@@ -1,6 +1,6 @@
-# stores-v1 contract sketch (exploration)
+# stores-v1 contract sketch
 
-Additive extensions only. Do **not** change `contracts.py` until a catalog-v3 / stores-v1 cutover is scheduled. Existing NL suite stays on `catalog-v2`.
+Additive extensions are in `contracts.py` for the stores-v1 path. Existing NL suite stays on `catalog-v2` (default loader unchanged).
 
 ## Models
 
@@ -15,7 +15,7 @@ class StoreRecord(Contract):
 class SearchInput(Contract):
     query: str
     max_results: int = 20
-    store_id: str | None = None  # REQUIRED when catalog_version startswith "stores-"
+    store_id: str | None = None  # multi-store API requires it (400 if missing); single-store ignores
 
 class CartSelection(Contract):
     product_id: str

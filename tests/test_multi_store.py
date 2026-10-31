@@ -14,7 +14,17 @@ from shopping_agent.contracts import (
     ShoppingRequest,
     TaskDefinition,
 )
-from shopping_agent.ingest import load_ingest, project_compat, project_multi
+from shopping_agent.ingest import (
+    load_ingest,
+    load_partition,
+    merge_partition_with_catalog,
+    project_compat,
+    project_multi,
+)
+from shopping_agent.tools.api import CatalogAPI
+from shopping_agent.eval.scoring import score
+from shopping_agent.interfaces import AgentOutput
+from shopping_agent.contracts import CatalogExample
 
 ROOT = Path(__file__).resolve().parents[1]
 INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.sample.json"
@@ -238,10 +248,58 @@ def test_multi_store_tasks_load():
     assert hiker_task.expected.valid_listing_ids == ["headwater-supply:tarn-fell"]
 
 
-def test_listing_aware_scoring_accepts_cheapest_store_only():
-    from shopping_agent.eval.scoring import score
-    from shopping_agent.interfaces import AgentOutput
+def test_partition_loader_accepts_blurb_and_role():
+    partition = load_partition(ROOT / "mock-store/server/examples/stores-partition-v1.json")
+    assert partition.stores[0].notes  # blurb aliased to notes
+    assert any(row.role == "overlap" for row in partition.assortment)
+    catalog = CatalogExample.model_validate_json(
+        (ROOT / "mock-store/server/examples/catalog.json").read_text(encoding="utf-8")
+    )
+    merged = merge_partition_with_catalog(partition, catalog)
+    assert merged.catalog_bootstrap == "catalog-v2"
+    assert len(merged.assortment) == len(partition.assortment)
 
+
+def test_listing_lookup_and_list_stores_via_api():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+    with TestClient(create_app(store)) as client:
+        api = CatalogAPI(client)
+        stores = api.list_stores()
+        assert {s.store_id for s in stores} >= {"trailworks-direct", "summit-outfitters"}
+
+        by_pair = api.get_listing("ridge-shell", store_id="summit-outfitters")
+        assert by_pair.store_id == "summit-outfitters"
+        assert by_pair.listing_id == "summit-outfitters:ridge-shell"
+        assert by_pair.product.price == 94.0
+
+        by_listing = api.get_listing(listing_id="trailworks-direct:ridge-shell")
+        assert by_listing.listing_id == "trailworks-direct:ridge-shell"
+        assert by_listing.product.price == 89.0
+
+
+def test_multi_store_no_valid_product_scoring_does_not_crash():
+    ingest, tasks = load_multi_store_examples()
+    task = tasks["multistore_cheapest_waterproof_shell"].model_copy(deep=True)
+    task.expected.kind = "no_valid_product"
+    task.expected.valid_product_ids = []
+    task.expected.valid_listing_ids = []
+    # Impossible constraints so candidates empty.
+    task.request.constraints[0].value = "spaceships"
+    store = MultiStore(ingest, {task.task_id: task})
+    store.reset(task.task_id)
+    ok, _, _ = score(
+        task,
+        AgentOutput(
+            response_text="Nothing matched.",
+            termination_reason="no_valid_product",
+        ),
+        store.snapshot(),
+    )
+    assert ok
+
+
+def test_listing_aware_scoring_accepts_cheapest_store_only():
     ingest, tasks = load_multi_store_examples()
     task = tasks["multistore_cheapest_waterproof_shell"]
     store = MultiStore(ingest, tasks)

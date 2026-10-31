@@ -6,7 +6,7 @@ from enum import StrEnum
 from math import isfinite
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
 class Contract(BaseModel):
@@ -47,7 +47,10 @@ class StoreRecord(Contract):
     store_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     name: str = Field(min_length=1)
     brand_seller: str = Field(min_length=1)
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("notes", "blurb"),
+    )
 
 
 class Product(Contract):
@@ -174,6 +177,8 @@ class ProductObservation(Contract):
     source_url: str
     observed_at: datetime
     catalog_version: str
+    store_id: str | None = None
+    listing_id: str | None = None
 
 
 class SearchResult(Contract):
@@ -263,27 +268,30 @@ class IngestProduct(Contract):
     provenance: IngestProvenance | None = None
 
 
+def listing_id_for(store_id: str, product_id: str) -> str:
+    """Canonical listing key: `{store_id}:{product_id}`."""
+    return f"{store_id}:{product_id}"
+
+
 class AssortmentRow(Contract):
-    listing_id: str = Field(pattern=r"^[a-z0-9-]+:[a-z0-9_-]+$")
     store_id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     product_id: str = Field(pattern=r"^[a-z0-9_-]+$")
     price: float = Field(ge=0)
     stock: int = Field(ge=0)
     sponsored: bool = False
+    listing_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]+:[a-z0-9_-]+$")
+    role: str | None = None  # informational bootstrap tag; ignored by runtime
 
     @model_validator(mode="after")
     def validate_price_and_id(self):
         if not isfinite(self.price) or Decimal(str(self.price)) * 100 % 1 != 0:
             raise ValueError("price must be a finite number of whole cents")
         expected = listing_id_for(self.store_id, self.product_id)
-        if self.listing_id != expected:
+        if self.listing_id is None:
+            self.listing_id = expected
+        elif self.listing_id != expected:
             raise ValueError(f"listing_id {self.listing_id!r} != {expected!r}")
         return self
-
-
-def listing_id_for(store_id: str, product_id: str) -> str:
-    """Canonical listing key: `{store_id}:{product_id}`."""
-    return f"{store_id}:{product_id}"
 
 
 def resolve_mutation_rows(
@@ -299,9 +307,21 @@ def resolve_mutation_rows(
     return [row for row in listings.values() if row.product_id == mutation.product_id]
 
 
+class StoresPartition(Contract):
+    """Assortment overlay for an existing catalog (no inline products)."""
+
+    ingest_version: Literal["ingest-v1"] | None = "ingest-v1"
+    catalog_bootstrap: str | None = None
+    notes: str | None = None
+    stores: list[StoreRecord] = Field(min_length=1)
+    assortment: list[AssortmentRow] = Field(min_length=1)
+    overlap_rules: dict[str, str | int | float | bool | list[str]] | None = None
+
+
 class IngestCatalog(Contract):
     ingest_version: Literal["ingest-v1"] = "ingest-v1"
     notes: str | None = None
+    catalog_bootstrap: str | None = None
     stores: list[StoreRecord] = Field(min_length=1)
     products: list[IngestProduct] = Field(min_length=1)
     assortment: list[AssortmentRow] = Field(min_length=1)

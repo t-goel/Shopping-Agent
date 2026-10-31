@@ -171,10 +171,27 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         ]
 
     @app.get("/api/products/{product_id}", response_model=Listing)
-    def get_product(product_id: str, request: Request):
+    def get_product(
+        product_id: str,
+        request: Request,
+        store_id: str | None = Query(default=None),
+    ):
         if isinstance(store, MultiStore):
-            product = store.get_product(product_id)
-            return as_listing(product, request, store.catalog_version)
+            if store_id:
+                product = store.get_product(store_id, product_id)
+                lid = listing_id_for(store_id, product_id)
+            else:
+                product = store.get_product(product_id)
+                ingest_product = store.products[product_id]
+                store_id = ingest_product.canonical_store_id
+                lid = listing_id_for(store_id, product_id)
+            return as_listing(
+                product,
+                request,
+                store.catalog_version,
+                store_id=store_id,
+                listing_id=lid,
+            )
         return as_listing(store.get_product(product_id), request, store.catalog.version)
 
     @app.get("/api/products/{product_id}/reviews", response_model=list[Review])

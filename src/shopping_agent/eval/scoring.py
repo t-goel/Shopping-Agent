@@ -79,6 +79,16 @@ def _score_listings(
     }:
         return False, satisfied, len(hard_constraints)
 
+    if task.expected.kind == "clarification":
+        success = (
+            output.termination_reason == "clarification_needed"
+            and not selected_listings
+            and not output.selected_product_ids
+            and not cart
+            and task.expected.question_contains.casefold() in output.response_text.casefold()
+        )
+        return success, satisfied, len(hard_constraints)
+
     candidates = [
         (listing_id, product)
         for listing_id, product in views.items()
@@ -114,7 +124,15 @@ def _score_listings(
     else:
         winning_listings = {listing_id for listing_id, _ in candidates}
 
-    valid_ids = winning_listings & set(task.expected.valid_listing_ids)
+    if task.expected.valid_listing_ids:
+        valid_ids = winning_listings & set(task.expected.valid_listing_ids)
+    else:
+        valid_product_ids = set(task.expected.valid_product_ids)
+        valid_ids = {
+            listing_id
+            for listing_id in winning_listings
+            if views[listing_id].product_id in valid_product_ids
+        }
     selected = selected_listings
     success = (
         output.termination_reason == "completed"
@@ -131,7 +149,8 @@ def _score_listings(
 
 
 def score(task: TaskDefinition, output: AgentOutput, snapshot: dict) -> tuple[bool, int, int]:
-    if task.expected.valid_listing_ids and "listings" in snapshot:
+    # Multi-store snapshots always score via listings (incl. no_valid_product / clarification).
+    if "listings" in snapshot:
         return _score_listings(task, output, snapshot)
 
     products = {

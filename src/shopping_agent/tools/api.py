@@ -11,6 +11,7 @@ from shopping_agent.contracts import (
     ProductObservation,
     SearchInput,
     SearchResult,
+    StoreRecord,
 )
 from shopping_agent.interfaces import CartObservation
 
@@ -48,7 +49,13 @@ class CatalogAPI:
             source_url=data["source_url"],
             observed_at=data["observed_at"],
             catalog_version=data["catalog_version"],
+            store_id=data.get("store_id"),
+            listing_id=data.get("listing_id"),
         )
+
+    def list_stores(self) -> list[StoreRecord]:
+        response = self._request("GET", "/api/stores")
+        return [StoreRecord.model_validate(row) for row in response.json()]
 
     def search(self, inputs: SearchInput) -> SearchResult:
         params: dict[str, str | int] = {"q": inputs.query, "limit": inputs.max_results}
@@ -60,8 +67,24 @@ class CatalogAPI:
             query=inputs.query,
         )
 
-    def get_listing(self, product_id: str) -> ProductObservation:
-        response = self._request("GET", f"/api/products/{quote(product_id, safe='')}")
+    def get_listing(
+        self,
+        product_id: str | None = None,
+        *,
+        store_id: str | None = None,
+        listing_id: str | None = None,
+    ) -> ProductObservation:
+        if listing_id:
+            response = self._request("GET", f"/api/listings/{quote(listing_id, safe='')}")
+            return self._observation(response.json())
+        if not product_id:
+            raise ToolError("product_id or listing_id is required")
+        params = {"store_id": store_id} if store_id else None
+        response = self._request(
+            "GET",
+            f"/api/products/{quote(product_id, safe='')}",
+            params=params,
+        )
         return self._observation(response.json())
 
     def _cart(self, response: httpx.Response) -> CartObservation:

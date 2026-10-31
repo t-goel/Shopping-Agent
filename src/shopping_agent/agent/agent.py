@@ -15,24 +15,33 @@ from shopping_agent.verifier import eligible, verify_claims
 
 TOOLS = [
     {
+        "name": "list_stores",
+        "description": "List storefronts (multi-store catalogs).",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "search",
-        "description": "Search the product catalog.",
+        "description": "Search the product catalog. Pass store_id in multi-store mode.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
                 "max_results": {"type": "integer"},
+                "store_id": {"type": "string"},
             },
             "required": ["query"],
         },
     },
     {
         "name": "get_listing",
-        "description": "Get current details for one product.",
+        "description": "Get listing details by listing_id or (store_id, product_id).",
         "input_schema": {
             "type": "object",
-            "properties": {"product_id": {"type": "string"}},
-            "required": ["product_id"],
+            "properties": {
+                "product_id": {"type": "string"},
+                "store_id": {"type": "string"},
+                "listing_id": {"type": "string"},
+            },
         },
     },
     {
@@ -130,10 +139,16 @@ class Agent:
         return response.json()
 
     def use_tool(self, name, arguments, tools):
+        if name == "list_stores":
+            return tools.list_stores()
         if name == "search":
             return tools.search(SearchInput.model_validate(arguments))
         if name == "get_listing":
-            return tools.get_listing(arguments["product_id"])
+            return tools.get_listing(
+                arguments.get("product_id"),
+                store_id=arguments.get("store_id"),
+                listing_id=arguments.get("listing_id"),
+            )
         if name == "inspect_cart":
             return tools.inspect_cart()
         raise ValueError("Unknown tool: " + str(name))
