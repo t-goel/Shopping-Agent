@@ -4,6 +4,8 @@ __pycache__/
 .ruff_cache/
 mock-store/storefront/node_modules/
 mock-store/storefront/dist/
+# Ephemeral eval/run dumps. Tracked ingest catalog lives under data/ingest/.
 results/
+output/
 .env
 .env.*
