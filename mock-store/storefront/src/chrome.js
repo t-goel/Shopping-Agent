@@ -1,33 +1,48 @@
-/** Deterministic Amazon-like chrome derived from catalog fields (not ground truth). */
+/** Deterministic merchandising chrome. Product photos are hotlinked from free stock CDNs — not vendored into public/. */
+
+/** Unsplash CDN (images.unsplash.com) — free license; hotlink, don't rehost. */
+const u = (id, w = 800) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80`;
+
+/** Pexels CDN — free license; hotlink static photo URLs. */
+const p = (id, w = 800) =>
+  `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
 
 const IMAGE_MAP = {
-  'ridge-shell': '/images/unsplash_ridge_shell_navy.jpg',
-  'summit-shell': '/images/unsplash_summit_shell_black.jpg',
-  'city-windbreaker': '/images/unsplash_city_windbreaker_olive.jpg',
-  'harbor-backpack': '/images/unsplash_harbor_backpack_blue.jpg',
-  'granite-hiker': '/images/unsplash_granite_hiker_boots.jpg',
-  'tarn-fell': '/images/unsplash_tarn_fell_trail_shoe.jpg',
-  'headwater-duffel': '/images/unsplash_155306240798eeb64c6a62_backpack.jpg',
-  'frostline-boot': '/images/unsplash_1520134491winter_boots.jpg',
-  'ridge-pack': '/images/pexels_16359246_backpack_closeup.jpg',
-  'canyon-pack': '/images/pexels_17492073_backpack_trail.jpg',
-  'basalt-carryall': '/images/pexels_18999339_backpack_city.jpg',
-  'swale-runner': '/images/pexels_27972214_black_hiking_shoe.jpg',
-  'cinder-hiker': '/images/pexels_37183559_hiking_boots.jpg',
-  'river-shell': '/images/pexels_9258084_rainjacket_forest.jpg',
-  'peak-quest-ultra': '/images/pexels_27972214_black_hiking_shoe.jpg',
-  'meadow-sling': '/images/pexels_16359246_backpack_closeup.jpg',
-  'umbra-messenger': '/images/pexels_18999339_backpack_city.jpg',
-  'fogbank-moc': '/images/pexels_37183559_hiking_boots.jpg',
-  'ridge-shell-reseller': '/images/unsplash_ridge_shell_navy.jpg',
-  'ridge-pack-reseller': '/images/pexels_16359246_backpack_closeup.jpg',
+  'ridge-shell': u('photo-1544441893-675973e31985'),
+  'summit-shell': u('photo-1548883354-7622d03aca27'),
+  'city-windbreaker': u('photo-1551028719-00167b16eac5'),
+  'harbor-backpack': u('photo-1546938576-6e6a64f317cc'),
+  'granite-hiker': u('photo-1520639888713-7851133b1ed0'),
+  'tarn-fell': u('photo-1542291026-7eec264c27ff'),
+  'headwater-duffel': u('photo-1553062407-98eeb64c6a62'),
+  'frostline-boot': u('photo-1520639888713-7851133b1ed0'),
+  'ridge-pack': p('16359246'),
+  'canyon-pack': p('17492073'),
+  'basalt-carryall': p('18999339'),
+  'swale-runner': p('27972214'),
+  'cinder-hiker': p('37183559'),
+  'river-shell': p('9258084'),
+  'peak-quest-ultra': p('27972214'),
+  'meadow-sling': p('16359246'),
+  'umbra-messenger': p('18999339'),
+  'fogbank-moc': p('37183559'),
+  'ridge-shell-reseller': u('photo-1544441893-675973e31985'),
+  'ridge-pack-reseller': p('16359246'),
 };
 
 const CATEGORY_FALLBACK = {
-  jackets: '/images/pexels_7578330_raincoat_umbrella.jpg',
-  bags: '/images/pexels_17492073_backpack_trail.jpg',
-  footwear: '/images/pexels_37183559_hiking_boots.jpg',
+  jackets: p('7578330'),
+  bags: p('17492073'),
+  footwear: p('37183559'),
 };
+
+const GALLERY_EXTRAS = [
+  u('photo-1553062407-98eeb64c6a62', 700),
+  p('17492073', 700),
+  p('9258084', 700),
+  u('photo-1546938576-6e6a64f317cc', 700),
+];
 
 const CHOICE = {
   'ridge-shell': "editors' shortlist · lightweight rain shells",
@@ -91,19 +106,16 @@ function hash(str) {
 export function productImages(product) {
   const hero = IMAGE_MAP[product.product_id] || CATEGORY_FALLBACK[product.category] || CATEGORY_FALLBACK.bags;
   const categoryFallback = CATEGORY_FALLBACK[product.category] || hero;
-  const pool = [
-    hero,
-    categoryFallback,
-    '/images/pexels_16359246_backpack_closeup.jpg',
-    '/images/pexels_17492073_backpack_trail.jpg',
-    '/images/pexels_9258084_rainjacket_forest.jpg',
-  ];
+  const pool = [hero, categoryFallback, ...GALLERY_EXTRAS];
   const unique = [];
   for (const src of pool) {
     if (!unique.includes(src)) unique.push(src);
   }
   return unique.slice(0, 4);
 }
+
+/** Default hero when a cart line has no catalog match. */
+export const FALLBACK_PRODUCT_IMAGE = CATEGORY_FALLBACK.bags;
 
 export const PHOTO_STREAM_CAPTIONS = [
   'Primary field view',

@@ -22,6 +22,15 @@ Vite proxies `/api` requests to `http://localhost:8000`. Start the backend separ
 
 Product cards use `product_id`, `title`, `description`, `category`, numeric `price` in USD, integer `stock`, `seller`, `rating`, `review_count`, `attributes`, `sponsored`, and optional `image_url`. Cart line items use `product_id`, `quantity`, `unit_price`, and `line_total`.
 
+## Product images
+
+Do **not** vendor binaries under `public/images/`. The storefront hotlinks curated free stock from:
+
+- [Unsplash](https://unsplash.com/license) via `images.unsplash.com` (stable photo IDs in `src/chrome.js`)
+- [Pexels](https://www.pexels.com/license/) via `images.pexels.com`
+
+No API key is required for display URLs. Mapping is deterministic by `product_id` / category so PDPs stay stable across reloads. Offline/CI eval runners do not need these images.
+
 ## Build
 
 ```sh
