@@ -4,6 +4,9 @@ __pycache__/
 .ruff_cache/
 mock-store/storefront/node_modules/
 mock-store/storefront/dist/
+# Ephemeral eval/run dumps. Intentional research artifacts live under docs/
+# (e.g. docs/scrape-catalog/), not here.
 results/
+output/
 .env
 .env.*

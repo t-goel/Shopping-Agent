@@ -6,7 +6,7 @@ Parent densify UI: [PR #17](https://github.com/t-goel/Shopping-Agent/pull/17) (c
 
 ## Live probe (2026-10-31) — can we *reach* listings?
 
-Earlier exploration stopped at ToS/schema and did **not** pull live retailer pages. Revisited with headed Chrome (`chrome-use --launch`). Structural notes + screenshots: [`output/samples/retailer-captures/`](samples/retailer-captures/).
+Earlier exploration stopped at ToS/schema and did **not** pull live retailer pages. Revisited with headed Chrome (`chrome-use --launch`). Structural notes + screenshots: [`samples/retailer-captures/`](samples/retailer-captures/).
 
 | Retailer | Headed browser | Raw HTTP | Listings readable? |
 |---|---|---|---|
@@ -30,8 +30,8 @@ Earlier exploration stopped at ToS/schema and did **not** pull live retailer pag
 
 Built from live pages for mock-store density recreation:
 
-- Pack: [`output/samples/retailer-captures/densify-reference-pack.json`](samples/retailer-captures/densify-reference-pack.json)
-- How-to: [`output/samples/retailer-captures/densify-from-retailers.md`](samples/retailer-captures/densify-from-retailers.md)
+- Pack: [`samples/retailer-captures/densify-reference-pack.json`](samples/retailer-captures/densify-reference-pack.json)
+- How-to: [`samples/retailer-captures/densify-from-retailers.md`](samples/retailer-captures/densify-from-retailers.md)
 - Products: REI Torrentshell + Rainier PDPs; Target Open Story 35L PDP; Walmart 50L Flash-Deal PDP; plus PLP/search tile grids for all three
 - Each entry lists **product core fields** and **all surrounding chrome** (promos, fulfillment, financing, membership, related rails, reviews/Q&A, badges) — relevant or not
 
@@ -113,11 +113,11 @@ Author / synthesize counterfactual products (fictitious brands, decoy taxonomy)
 
 | Path | Role |
 |---|---|
-| [`output/scrape-catalog-explore.md`](scrape-catalog-explore.md) | This report |
-| [`output/samples/ingest-v1.schema.json`](samples/ingest-v1.schema.json) | Schema (`canonical_store_id`, `listing_id` pattern, `price` multipleOf 0.01, chrome-only `brand_seller`) |
-| [`output/samples/ingest-v1.sample.json`](samples/ingest-v1.sample.json) | 6 products / expanded assortment (bootstrap extras included) |
-| [`output/samples/stores-partition-v1.peer.json`](samples/stores-partition-v1.peer.json) | Snapshot of peer full catalog-v2 bootstrap |
-| Peer `output/samples/project_ingest.py` | Their projector (compat + multi) |
+| [`docs/scrape-catalog/scrape-catalog-explore.md`](scrape-catalog-explore.md) | This report |
+| [`docs/scrape-catalog/samples/ingest-v1.schema.json`](samples/ingest-v1.schema.json) | Schema (`canonical_store_id`, `listing_id` pattern, `price` multipleOf 0.01, chrome-only `brand_seller`) |
+| [`docs/scrape-catalog/samples/ingest-v1.sample.json`](samples/ingest-v1.sample.json) | 6 products / expanded assortment (bootstrap extras included) |
+| [`docs/scrape-catalog/samples/stores-partition-v1.peer.json`](samples/stores-partition-v1.peer.json) | Snapshot of peer full catalog-v2 bootstrap |
+| Peer `output/samples/project_ingest.py` | Their projector on multi-store branch (compat + multi) |
 
 ### Sample assortment (expanded)
 
