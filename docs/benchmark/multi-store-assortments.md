@@ -82,7 +82,7 @@ Recommendation: **require `store_id` for search** in multi-mode. Federated searc
 
 ## Bootstrap partition summary
 
-Concrete JSON: [`output/samples/stores-partition-v1.json`](samples/stores-partition-v1.json).
+Concrete JSON: [`mock-store/server/examples/stores-partition-v1.json`](../../mock-store/server/examples/stores-partition-v1.json).
 
 | Store | Unique highlights | Overlap SKUs |
 |---|---|---|
@@ -132,8 +132,7 @@ Optional later: `blurb`, `fulfillment`, store chrome tokens — not needed for b
 
 ## Peer lock status (2026-10-30) — **CLOSED**
 
-Scrape/ingest report (source of truth on their branch): `t3/scraped-catalog-feasibility` → `output/scrape-catalog-explore.md`  
-Local mirror: `output/scrape-catalog-explore.peer.md`
+Scrape/ingest report (source of truth on their branch): `t3/scraped-catalog-feasibility` → `output/scrape-catalog-explore.md` (local agent scratch; gitignored)
 
 | Item | Status |
 |---|---|
@@ -145,27 +144,27 @@ Local mirror: `output/scrape-catalog-explore.peer.md`
 | Public catalog source | **synthetic + ingest-v1** — no wholesale retailer scrape |
 | Cross-thread traffic | done unless a contract conflict appears |
 
-Prototypes under `output/samples/` (not wired into mock-store / NL suite):
+Shipped runtime (not under `output/`):
 
-| Script | Output | Behavior |
-|---|---|---|
-| `project_assortment.py` | `catalog-v2-stores-compat.json` | catalog-v2 + partition → flat Products |
-| `project_ingest.py` | `ingest-v1.compat.json`, `ingest-v1.multi.json` | ingest-v1 → compat (via `canonical_store_id`) **or** stores+listings |
-| `multi_store_search.py` | stdout demo | **requires** `store_id`; sponsored-first; seller stays `seller_default` |
-| `task-multistore-*.draft.json` | — | listing_id-scored task drafts (not loaded by mock-store) |
+| Piece | Path |
+|---|---|
+| Ingest sample | `mock-store/server/examples/ingest-v1.sample.json` |
+| Full bootstrap partition | `mock-store/server/examples/stores-partition-v1.json` |
+| Loader / projection | `src/shopping_agent/ingest.py` |
+| Multi-store runtime | `mock-store/server/multi_store.py` |
+| Pilot tasks | `data/tasks/stores/*.json` |
+| Contract sketch | `docs/benchmark/stores-v1-contracts.md` |
 
-Expanded peer sample (6 products / 10 listings) re-projected clean: overlaps `ridge-shell`, `harbor-backpack`, `tarn-fell`. Clearance shows genuine shell $99 beside reseller; Headwater `tarn-fell` $88 beats Trailworks $91.
+Expanded peer sample (6 products / 10 listings): overlaps `ridge-shell`, `harbor-backpack`, `tarn-fell`. Clearance shows genuine shell $99 beside reseller; Headwater `tarn-fell` $88 beats Trailworks $91.
 
-**Compat rule (updated):** use `canonical_store_id` for flat export (catalog-v2-stable), not cheapest-in-stock — cheapest-in-stock would pull `tarn-fell` to $88 and drift tasks that expect Trailworks/canonical prices.
+**Compat rule:** use `canonical_store_id` for flat export (catalog-v2-stable), not cheapest-in-stock.
 
 ## Next steps
 
-1. ~~Keep peer thread synced as partitions lock~~ — mutual lock done.
-2. ~~Prototype loader projection + store-scoped search~~ — under `output/samples/`.
-3. ~~Draft multi-store task shapes~~ — `task-multistore-cheapest-shell.draft.json`, `task-multistore-tarn-fell-price.draft.json`.
-4. ~~Sketch listing-keyed cart + mutations contracts~~ — `output/samples/stores-v1-contracts.sketch.md`.
-5. ~~Implement stores-v1 runtime~~ — `shopping_agent/ingest.py`, `mock-store/server/multi_store.py`, additive contracts, `GET /api/stores`, store-scoped search, listing-keyed cart/mutations, tasks under `data/tasks/stores/`, listing-aware scoring. Default NL suite still loads catalog-v2 only.
-6. Optional next: runner CLI flag for `--catalog stores-v1`; densified multi-store UI after PR #17.
+1. ~~Peer sync + design lock~~
+2. ~~stores-v1 runtime + listing-aware scoring~~ — default NL suite still loads catalog-v2 only
+3. Optional: runner CLI flag for `--catalog stores-v1`; densified multi-store UI after PR #17
+4. Keep generated scratch under `output/` (gitignored)
 
 
 ## Design stress findings
