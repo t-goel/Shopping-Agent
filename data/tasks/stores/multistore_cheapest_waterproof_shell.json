@@ -4,7 +4,7 @@
   "catalog_version": "stores-v1",
   "difficulty": "medium",
   "agent_surface": "structured",
-  "notes": "Scores by listing_id because ridge-shell price differs across stores. Agent must search with store_id; federated search is disallowed.",
+  "notes": "Scores by listing_id because ridge-shell price differs across stores. Agent must search with store_id; federated search is disallowed. Decoys: summit/clearance genuine shells at higher prices; clearance reseller is waterproof=false.",
   "request": {
     "original_text": "Find the cheapest waterproof jacket in size M under $100. Check each store — prices can differ.",
     "constraints": [
@@ -43,16 +43,5 @@
     "valid_listing_ids": ["trailworks-direct:ridge-shell"],
     "question_contains": null
   },
-  "decoys": {
-    "summit-outfitters:ridge-shell": "same product, $94 — fails lowest_price vs Trailworks $89",
-    "clearance-corner:ridge-shell": "same product, $99 — still under $100 but not cheapest",
-    "clearance-corner:ridge-shell-reseller": "keyword decoy; waterproof=false"
-  },
-  "mutations": [],
-  "tool_surface": {
-    "list_stores": true,
-    "search_requires_store_id": true,
-    "get_listing_accepts": ["listing_id", "store_id+product_id"],
-    "cart_keys_on": "listing_id"
-  }
+  "mutations": []
 }

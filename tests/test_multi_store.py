@@ -107,7 +107,17 @@ def test_store_scoped_search_and_validation():
         assert summit_shell["listing_id"] == "summit-outfitters:ridge-shell"
         assert summit_shell["store_id"] == "summit-outfitters"
 
-        # flat /api/products returns 400 in multi-store mode (no federated search)
+        # Shared /api/products still works when store_id is supplied (CatalogAPI path).
+        via_shared = api.get(
+            "/api/products",
+            params={"q": "waterproof", "store_id": "trailworks-direct"},
+        ).json()
+        assert any(
+            item["product_id"] == "ridge-shell" and item["price"] == 89.0
+            for item in via_shared
+        )
+
+        # Missing store_id => 400 (no federated search)
         assert api.get("/api/products", params={"q": "waterproof"}).status_code == 400
 
         # unknown store returns 400

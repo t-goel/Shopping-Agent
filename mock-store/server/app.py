@@ -6,7 +6,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
-from shopping_agent.contracts import Product, Review, StoreRecord
+from shopping_agent.contracts import Product, Review, StoreRecord, listing_id_for
 from server.state import Cart, Store, StoreError, load_examples
 from server.multi_store import MultiStore
 
@@ -122,7 +122,7 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
                     request,
                     catalog_version,
                     store_id=store_id,
-                    listing_id=f"{store_id}:{product.product_id}",
+                    listing_id=listing_id_for(store_id, product.product_id),
                 )
                 for product in products
             ]
@@ -147,9 +147,24 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         request: Request,
         q: str = Query(default="", max_length=200),
         limit: int = Query(default=20, ge=1, le=50),
+        store_id: str | None = Query(default=None),
     ):
+        # Shared search surface: single-store ignores store_id; multi-store requires it
+        # (no federated search) so CatalogAPI.search(SearchInput) keeps working.
         if isinstance(store, MultiStore):
-            raise StoreError("search in multi-store mode requires store_id", 400)
+            if not store_id:
+                raise StoreError("search in multi-store mode requires store_id", 400)
+            products = store.search(store_id, q, limit)
+            return [
+                as_listing(
+                    product,
+                    request,
+                    catalog_version,
+                    store_id=store_id,
+                    listing_id=listing_id_for(store_id, product.product_id),
+                )
+                for product in products
+            ]
         return [
             as_listing(product, request, store.catalog.version)
             for product in store.search(q, limit)

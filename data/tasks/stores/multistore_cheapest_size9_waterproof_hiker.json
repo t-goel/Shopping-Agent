@@ -37,10 +37,5 @@
     "valid_listing_ids": ["headwater-supply:tarn-fell"],
     "question_contains": null
   },
-  "mutations": [],
-  "tool_surface": {
-    "list_stores": true,
-    "search_requires_store_id": true,
-    "cart_keys_on": "listing_id"
-  }
+  "mutations": []
 }

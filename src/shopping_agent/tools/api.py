@@ -51,11 +51,10 @@ class CatalogAPI:
         )
 
     def search(self, inputs: SearchInput) -> SearchResult:
-        response = self._request(
-            "GET",
-            "/api/products",
-            params={"q": inputs.query, "limit": inputs.max_results},
-        )
+        params: dict[str, str | int] = {"q": inputs.query, "limit": inputs.max_results}
+        if inputs.store_id:
+            params["store_id"] = inputs.store_id
+        response = self._request("GET", "/api/products", params=params)
         return SearchResult(
             items=[self._observation(row) for row in response.json()],
             query=inputs.query,

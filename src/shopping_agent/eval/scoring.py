@@ -1,14 +1,9 @@
 """Evaluator-only scoring from final live state, never agent-reported success."""
 
+from shopping_agent.comparison import matches
 from shopping_agent.contracts import Product, TaskDefinition
-from shopping_agent.example_checks import matches
+from shopping_agent.example_checks import average_rating
 from shopping_agent.interfaces import AgentOutput
-
-
-def _average_rating(product: Product) -> float:
-    if product.reviews:
-        return sum(r.rating for r in product.reviews) / len(product.reviews)
-    return -1.0
 
 
 def _rank_products(candidates: list[Product], ranking_rule: str) -> list[Product]:
@@ -20,8 +15,8 @@ def _rank_products(candidates: list[Product], ranking_rule: str) -> list[Product
         return [p for p in candidates if p.price == best_price]
 
     if ranking_rule in {"highest_rating", "highest_rating_then_reviews"}:
-        best_rating = max(_average_rating(p) for p in candidates)
-        ranked = [p for p in candidates if _average_rating(p) == best_rating]
+        best_rating = max(average_rating(p) for p in candidates)
+        ranked = [p for p in candidates if average_rating(p) == best_rating]
         if ranking_rule == "highest_rating_then_reviews" and len(ranked) > 1:
             most_reviews = max(len(p.reviews) for p in ranked)
             ranked = [p for p in ranked if len(p.reviews) == most_reviews]
@@ -114,7 +109,7 @@ def _score_listings(
             listing_id
             for listing_id, product in candidates
             if (product.product_id, product.price, len(product.reviews)) in ranked_keys
-            and _average_rating(product) == _average_rating(ranked[0])
+            and average_rating(product) == average_rating(ranked[0])
         }
     else:
         winning_listings = {listing_id for listing_id, _ in candidates}

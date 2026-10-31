@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from math import isfinite
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -143,8 +143,6 @@ class TaskDefinition(Contract):
     expected: ExpectedOutcome
     mutations: list[Mutation] = Field(default_factory=list)
     notes: str | None = None
-    decoys: dict[str, Any] | None = None
-    tool_surface: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def clarification_matches_request(self):
@@ -277,10 +275,28 @@ class AssortmentRow(Contract):
     def validate_price_and_id(self):
         if not isfinite(self.price) or Decimal(str(self.price)) * 100 % 1 != 0:
             raise ValueError("price must be a finite number of whole cents")
-        expected_listing_id = f"{self.store_id}:{self.product_id}"
-        if self.listing_id != expected_listing_id:
-            raise ValueError(f"listing_id {self.listing_id!r} != {expected_listing_id!r}")
+        expected = listing_id_for(self.store_id, self.product_id)
+        if self.listing_id != expected:
+            raise ValueError(f"listing_id {self.listing_id!r} != {expected!r}")
         return self
+
+
+def listing_id_for(store_id: str, product_id: str) -> str:
+    """Canonical listing key: `{store_id}:{product_id}`."""
+    return f"{store_id}:{product_id}"
+
+
+def resolve_mutation_rows(
+    mutation: Mutation, listings: dict[str, AssortmentRow]
+) -> list[AssortmentRow]:
+    """Pick assortment rows a mutation should change (listing-, store-, or product-scoped)."""
+    if mutation.listing_id:
+        row = listings.get(mutation.listing_id)
+        return [row] if row is not None else []
+    if mutation.store_id:
+        row = listings.get(listing_id_for(mutation.store_id, mutation.product_id))
+        return [row] if row is not None else []
+    return [row for row in listings.values() if row.product_id == mutation.product_id]
 
 
 class IngestCatalog(Contract):

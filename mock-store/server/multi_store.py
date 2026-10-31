@@ -12,6 +12,8 @@ from shopping_agent.contracts import (
     Product,
     StoreRecord,
     TaskDefinition,
+    listing_id_for,
+    resolve_mutation_rows,
 )
 from shopping_agent.example_checks import expected_listings
 from shopping_agent.ingest import load_ingest
@@ -116,19 +118,7 @@ class MultiStore:
                 index not in self.applied_mutations
                 and self.observations >= mutation.after_observations
             ):
-                target_rows: list[AssortmentRow] = []
-                if mutation.listing_id:
-                    if mutation.listing_id in self.listings:
-                        target_rows.append(self.listings[mutation.listing_id])
-                elif mutation.store_id:
-                    lid = f"{mutation.store_id}:{mutation.product_id}"
-                    if lid in self.listings:
-                        target_rows.append(self.listings[lid])
-                else:
-                    for row in self.listings.values():
-                        if row.product_id == mutation.product_id:
-                            target_rows.append(row)
-
+                target_rows = resolve_mutation_rows(mutation, self.listings)
                 for row in target_rows:
                     if mutation.price is not None:
                         row.price = mutation.price
@@ -219,8 +209,7 @@ class MultiStore:
                 product = self.products.get(pid)
                 if product is None:
                     raise StoreError("product not found", 404)
-                canonical = product.canonical_store_id
-                listing_id = f"{canonical}:{pid}"
+                listing_id = listing_id_for(product.canonical_store_id, pid)
                 listing = self.listings.get(listing_id)
                 if listing is None:
                     raise StoreError("listing not found", 404)
@@ -230,7 +219,7 @@ class MultiStore:
                 store_id = store_id_or_product_id
                 if store_id not in self.stores:
                     raise StoreError(f"unknown store_id: {store_id}", 400)
-                listing_id = f"{store_id}:{product_id}"
+                listing_id = listing_id_for(store_id, product_id)
                 listing = self.listings.get(listing_id)
                 if listing is None:
                     raise StoreError("listing not found", 404)
@@ -272,12 +261,12 @@ class MultiStore:
             target_listing_id = listing_id
             if not target_listing_id:
                 if store_id and product_id:
-                    target_listing_id = f"{store_id}:{product_id}"
+                    target_listing_id = listing_id_for(store_id, product_id)
                 elif product_id:
                     prod = self.products.get(product_id)
                     if prod is None:
                         raise StoreError("product not found", 404)
-                    target_listing_id = f"{prod.canonical_store_id}:{product_id}"
+                    target_listing_id = listing_id_for(prod.canonical_store_id, product_id)
                 else:
                     raise StoreError("listing_id or product_id required", 422)
 

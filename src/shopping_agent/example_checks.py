@@ -7,12 +7,13 @@ from shopping_agent.contracts import (
     IngestCatalog,
     Product,
     TaskDefinition,
+    resolve_mutation_rows,
 )
 
 
-def _rating(product: Product) -> float:
+def average_rating(product: Product) -> float:
     if not product.reviews:
-        return -1
+        return -1.0
     return sum(r.rating for r in product.reviews) / len(product.reviews)
 
 
@@ -45,8 +46,8 @@ def expected_products(catalog: CatalogExample, task: TaskDefinition) -> set[str]
         candidates = [product for product in candidates if product.price == best]
 
     elif task.ranking_rule in {"highest_rating", "highest_rating_then_reviews"}:
-        best = max(_rating(product) for product in candidates)
-        candidates = [product for product in candidates if _rating(product) == best]
+        best = max(average_rating(product) for product in candidates)
+        candidates = [product for product in candidates if average_rating(product) == best]
 
         if task.ranking_rule == "highest_rating_then_reviews" and len(candidates) > 1:
             most_reviews = max(len(product.reviews) for product in candidates)
@@ -82,18 +83,7 @@ def expected_listings(ingest: IngestCatalog, task: TaskDefinition) -> set[str]:
     }
 
     for mutation in task.mutations:
-        targets: list[AssortmentRow] = []
-        if mutation.listing_id and mutation.listing_id in listings:
-            targets = [listings[mutation.listing_id]]
-        elif mutation.store_id:
-            lid = f"{mutation.store_id}:{mutation.product_id}"
-            if lid in listings:
-                targets = [listings[lid]]
-        else:
-            targets = [
-                row for row in listings.values() if row.product_id == mutation.product_id
-            ]
-        for row in targets:
+        for row in resolve_mutation_rows(mutation, listings):
             if mutation.price is not None:
                 row.price = mutation.price
             if mutation.stock is not None:
@@ -117,11 +107,11 @@ def expected_listings(ingest: IngestCatalog, task: TaskDefinition) -> set[str]:
         }
 
     if task.ranking_rule in {"highest_rating", "highest_rating_then_reviews"}:
-        best = max(_rating(product) for _, product in candidates)
+        best = max(average_rating(product) for _, product in candidates)
         ranked = [
             (listing_id, product)
             for listing_id, product in candidates
-            if _rating(product) == best
+            if average_rating(product) == best
         ]
         if task.ranking_rule == "highest_rating_then_reviews" and len(ranked) > 1:
             most = max(len(product.reviews) for _, product in ranked)
