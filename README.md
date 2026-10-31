@@ -77,7 +77,9 @@ The original pilot records are retained alongside the rerun after the reviewer f
 The default `data/tasks` directory now contains natural-language tasks; the rules agent
 requires `--tasks data/tasks/harness`. The runner rejects incompatible input conditions
 and missing Claude credentials before writing trial records. Use `--agent claude` for
-the NL suite with `ANTHROPIC_API_KEY` configured in the environment.
+the NL suite with `ANTHROPIC_API_KEY` configured in the environment. The Claude agent
+defaults to `claude-haiku-5-5` at `high` effort (`ANTHROPIC_MODEL` /
+`ANTHROPIC_EFFORT` override).
 
 Reports include per-task outcomes and observable failure categories. Add `--markdown`
 to `report` for a table suitable for the project update. Reports reject mixed agent,
