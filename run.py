@@ -13,86 +13,25 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "mock-store" / "storefront"
-# Bind all interfaces so Tailscale / LAN clients can reach the store (not just this machine's loopback).
-BIND_HOST = "0.0.0.0"
+# Default loopback. Set HOST=0.0.0.0 (or another bind address) to listen on the LAN.
+BIND_HOST = os.environ.get("HOST", "127.0.0.1")
 API_PORT = 8000
 SHOP_PORT = 5173
 API_URL = f"http://127.0.0.1:{API_PORT}/api/products"
 SHOP_URL = f"http://127.0.0.1:{SHOP_PORT}"
 NPM = "npm.cmd" if os.name == "nt" else "npm"
+NODE = "node"
 
 
-def resolve_node() -> str:
-    """Prefer system Node.js; vite-plus's runtime is often firewall-blocked for inbound Tailscale."""
-    if os.name == "nt":
-        system_node = Path(r"C:\Program Files\nodejs\node.exe")
-        if system_node.is_file():
-            return str(system_node)
-    found = shutil.which("node")
-    if found is None:
-        raise RuntimeError("Node.js is required; install Node.js 20 or newer, then rerun.")
-    return found
-
-
-def _tailscale_bin() -> str | None:
-    return shutil.which("tailscale") or shutil.which("tailscale.exe")
-
-
-def tailscale_ipv4() -> str | None:
-    """Best-effort Tailscale IPv4 for the Network: banner; None if unavailable."""
-    executable = _tailscale_bin()
-    if executable is None:
-        return None
-    try:
-        completed = subprocess.run(
-            [executable, "ip", "-4"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    address = (completed.stdout or "").strip().splitlines()
-    return address[0].strip() if address else None
-
-
-def tailscale_app_url(port: int) -> str | None:
-    """Prefer MagicDNS serve URL when `tailscale serve` is proxying this port."""
-    executable = _tailscale_bin()
-    if executable is None:
-        return None
-    try:
-        completed = subprocess.run(
-            [executable, "serve", "status"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    needle = f":{port}"
-    for line in (completed.stdout or "").splitlines():
-        text = line.strip()
-        if text.startswith("http") and needle in text and ".ts.net" in text:
-            return text if text.endswith("/") else f"{text}/"
-    for line in (completed.stdout or "").splitlines():
-        text = line.strip()
-        if text.startswith("http") and needle in text:
-            return text if text.endswith("/") else f"{text}/"
-    return None
-
-
-def ensure_frontend_dependencies(node: str) -> None:
+def ensure_frontend_dependencies() -> None:
     """Install storefront packages on first run when npm has not created node_modules."""
     if (FRONTEND / "node_modules" / "vite").exists():
         return
 
-    if shutil.which(NPM) is None or not Path(node).exists():
+    if shutil.which(NPM) is None or shutil.which(NODE) is None:
         raise RuntimeError("Node.js and npm are required; install Node.js 20 or newer, then rerun.")
 
-    print("Installing storefront packages for the first run...", flush=True)
+    print("Installing storefront packages for the first run...")
     subprocess.run([NPM, "install"], cwd=FRONTEND, check=True)
 
 
@@ -156,19 +95,13 @@ def main() -> int:
         print("Python packages are missing; run `py -m pip install -r requirements.txt`.", file=sys.stderr)
         return 1
 
-    try:
-        node = resolve_node()
-    except RuntimeError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-
-    if shutil.which(NPM) is None:
-        print("npm is required; install Node.js 20 or newer.", file=sys.stderr)
+    if shutil.which(NPM) is None or shutil.which(NODE) is None:
+        print("Node.js and npm are required; install Node.js 20 or newer.", file=sys.stderr)
         return 1
 
     processes = []
     try:
-        ensure_frontend_dependencies(node)
+        ensure_frontend_dependencies()
         api = subprocess.Popen(
             [
                 sys.executable, "-m", "uvicorn", "server.app:app",
@@ -182,7 +115,7 @@ def main() -> int:
 
         frontend = subprocess.Popen(
             [
-                node, "node_modules/vite/bin/vite.js", "--host", BIND_HOST,
+                NODE, "node_modules/vite/bin/vite.js", "--host", BIND_HOST,
                 "--port", str(SHOP_PORT), "--strictPort",
             ],
             cwd=FRONTEND,
@@ -190,23 +123,11 @@ def main() -> int:
         processes.append(frontend)
         wait_until_ready(SHOP_URL, frontend, "Storefront")
 
-        print(f"  Local:     http://localhost:{SHOP_PORT}/", flush=True)
-        ts_url = tailscale_app_url(SHOP_PORT) or (
-            f"http://{tailscale_ipv4()}:{SHOP_PORT}/" if tailscale_ipv4() else None
-        )
-        if ts_url:
-            print(f"  Tailscale: {ts_url}", flush=True)
-            docs = tailscale_app_url(API_PORT)
-            if docs:
-                print(f"  API docs:  {docs.rstrip('/')}/docs", flush=True)
-            elif (ip := tailscale_ipv4()):
-                print(f"  API docs:  http://{ip}:{API_PORT}/docs", flush=True)
-        print("Press Ctrl+C to stop both servers.", flush=True)
-        # Open the Tailscale URL in the laptop browser when one is available.
-        if ts_url:
-            webbrowser.open(ts_url)
-        elif sys.stdout.isatty():
-            webbrowser.open(f"http://localhost:{SHOP_PORT}/")
+        print(f"Shopping store is running at {SHOP_URL}")
+        if BIND_HOST not in {"127.0.0.1", "localhost"}:
+            print(f"Listening on {BIND_HOST} (override with HOST=…).")
+        print("Press Ctrl+C to stop both servers.")
+        webbrowser.open(SHOP_URL)
 
         while all(process.poll() is None for process in processes):
             time.sleep(0.5)
