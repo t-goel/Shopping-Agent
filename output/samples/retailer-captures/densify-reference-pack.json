@@ -1,0 +1,461 @@
+{
+  "pack_version": "densify-v1",
+  "purpose": "Product subset + surrounding chrome inventories from reachable retailers, so Goodthings mock stores can recreate information density (relevant and irrelevant).",
+  "captured_at": "2026-10-31",
+  "method": "headed Chrome (chrome-use --launch); private research captures",
+  "policy": "Do not ship retailer images/CDN assets or verbatim marketing dumps into catalog-v2 ground truth. Use this pack to author synthetic chrome + synthetic SKUs that match density. Provenance stays manual_capture / synthetic.",
+  "product_subset": [
+    {
+      "capture_id": "rei-torrentshell",
+      "source_retailer": "rei",
+      "page_kind": "pdp",
+      "source_url": "https://www.rei.com/product/215514/patagonia-torrentshell-3l-jacket-mens",
+      "screenshot": "rei-pdp-torrentshell-full.png",
+      "visible_text_dump": "rei-pdp-torrentshell-text.txt",
+      "product": {
+        "external_id": "215514",
+        "brand": "Patagonia",
+        "title": "Torrentshell 3L Jacket - Men's",
+        "price": 189.0,
+        "currency": "USD",
+        "rating": 4.4,
+        "review_count": 342,
+        "badges": [
+          "REI STAFF PICK",
+          "Waterproof",
+          "Packable"
+        ],
+        "weight": "14.1 ounces",
+        "ventilation": "Pit Zips",
+        "colors_shown": [
+          "Black",
+          "Canopy Green",
+          "Autumn Orange",
+          "Smolder Blue",
+          "Noble Grey",
+          "Glacial Blue",
+          "Deer Brown"
+        ],
+        "sizes_shown": [
+          "XS",
+          "S",
+          "M",
+          "L",
+          "XL",
+          "XXL",
+          "XXXL"
+        ],
+        "fit_note": "Fits slightly large based on reviews",
+        "member_reward_est": 18.9,
+        "attributes_ground_truth_hints": {
+          "waterproof": true,
+          "windproof": true,
+          "packable": true,
+          "category": "jackets"
+        }
+      },
+      "surrounding_chrome": {
+        "promo_rail": [
+          "Outlet cold-weather deals up to 50%",
+          "Become Co-op Member \u2192 $30 promo card when spending $50+",
+          "Mastercard: earn 15% Total REI Rewards"
+        ],
+        "gallery": [
+          "multi-image carousel (12 images)",
+          "model captions: height/waist/wearing size",
+          "product video tile",
+          "color-specific image labels"
+        ],
+        "buy_box": [
+          "color swatches",
+          "size chart link",
+          "qty stepper",
+          "Pick up vs Ship to address FREE",
+          "ZIP for delivery dates",
+          "Members get est. $X rewards (10%)",
+          "checkbox: Add lifetime membership $30",
+          "Add to cart",
+          "wishlist",
+          "REI return policy link"
+        ],
+        "content_sections": [
+          "Features bullet list (H2No shell, ECONYL, PFC-free DWR, hood, pockets, packable\u2026)",
+          "Fair Trade Certified / Imported",
+          "Technical Specs table (Best Use, Fabric, Windproof, Waterproof, \u2026)",
+          "Product line / category links",
+          "Membership math upsell ($18 reward + $30 bonus = $48 value)",
+          "Educational: Waterproof vs water-resistant explainer",
+          "Reviews: avg fit, helpful favorable/critical, write review, sort",
+          "Q&A: sizing over fleece, waterproof rating, restock questions"
+        ],
+        "noise_for_agents": [
+          "membership upsell competes with Add to cart",
+          "staff pick badge \u2260 constraint satisfaction",
+          "model size captions can confuse size selection",
+          "reward estimates look like discounts but are not price"
+        ]
+      }
+    },
+    {
+      "capture_id": "rei-rainier",
+      "source_retailer": "rei",
+      "page_kind": "pdp",
+      "source_url": "https://www.rei.com/product/227570/rei-co-op-rainier-rain-jacket-mens",
+      "screenshot": "rei-pdp-rainier-full.png",
+      "visible_text_dump": "rei-pdp-rainier-text.txt",
+      "product": {
+        "external_id": "227570",
+        "brand": "REI Co-op",
+        "title": "Rainier Rain Jacket - Men's",
+        "price": 99.95,
+        "currency": "USD",
+        "rating": 4.1,
+        "review_count": 454,
+        "badges": [
+          "Waterproof",
+          "Packable"
+        ],
+        "weight": "11.3 ounces",
+        "ventilation": "Pit Zips",
+        "sizes_shown": [
+          "XS",
+          "S",
+          "M",
+          "M Tall",
+          "L",
+          "L Tall",
+          "XL",
+          "XL Tall",
+          "XXL",
+          "XXL Tall",
+          "XXXL"
+        ],
+        "fit_note": "Fits slightly large based on reviews",
+        "member_reward_est": 9.99,
+        "attributes_ground_truth_hints": {
+          "waterproof": true,
+          "windproof": true,
+          "packable": true,
+          "membrane": "2.5-layer HydroWall",
+          "category": "jackets"
+        }
+      },
+      "surrounding_chrome": {
+        "same_zones_as": "rei-torrentshell",
+        "extra_notes": [
+          "Tall size variants increase size-grid clutter",
+          "Ship FREE with $100 minimum callout",
+          "173 of 235 reviewers recommended strip",
+          "Climate Label / bluepass / Fair Trade sustainability chrome",
+          "DWR renewal care essay below features"
+        ]
+      }
+    },
+    {
+      "capture_id": "target-openstory-35l",
+      "source_retailer": "target",
+      "page_kind": "pdp",
+      "source_url": "https://www.target.com/p/35l-travel-backpack-open-story/-/A-95253190?preselect=95106064",
+      "screenshot": "target-pdp-openstory-full.png",
+      "visible_text_dump": "target-pdp-openstory-text.txt",
+      "product": {
+        "external_id": "A-95253190 / TCIN 95106064",
+        "brand": "Open Story",
+        "title": "35L Travel Backpack - Open Story\u2122 Black",
+        "price": 50.0,
+        "currency": "USD",
+        "rating": 5.0,
+        "review_count": 1,
+        "badges": [
+          "New at Target",
+          "900+ bought in last month"
+        ],
+        "capacity_liters": 35,
+        "attributes_ground_truth_hints": {
+          "waterproof": false,
+          "water_repellent": true,
+          "capacity_liters": 35,
+          "laptop_inches": 17,
+          "category": "bags"
+        }
+      },
+      "surrounding_chrome": {
+        "fulfillment_matrix": [
+          "Pickup: Get it nearby tomorrow",
+          "Delivery: Check availability",
+          "Shipping: Arrives by Wed, Nov 4",
+          "Not sold at Champaign Campustown",
+          "Available near you / Ready tomorrow / Always free",
+          "Show in-stock stores"
+        ],
+        "trust_and_pay": [
+          "Free & easy returns (365 days mail or in store)",
+          "Eligible for registries and wish lists",
+          "Save 5% every day with Target Circle\u2122 Card",
+          "Pay in 4 with PayPal ($12.50)",
+          "Affirm as low as $9/mo"
+        ],
+        "content_sections": [
+          "Fit & style bullets",
+          "Description (brand slogan: Every journey inspires a new chapter)",
+          "Specifications (dims, shell 100% recycled polyester, compartments, warranty, TCIN/UPC/DPCI)",
+          "At a glance: Water Bottle Pocket",
+          "Shipping & Returns / Q&A (1)",
+          "Discover more options carousels (related Open Story bags $17.50\u2013$80)",
+          "Guest ratings & reviews (lazy-loaded)"
+        ],
+        "noise_for_agents": [
+          "financing offers look like price reductions",
+          "Circle Card 5% is not the listed price",
+          "store stock differs from shipping availability",
+          "1 review at 5.0 is a ranking trap"
+        ]
+      }
+    },
+    {
+      "capture_id": "walmart-muzpu-50l",
+      "source_retailer": "walmart",
+      "page_kind": "pdp",
+      "source_url": "https://www.walmart.com/ip/Travel-Backpack-50L-New-Premium-Unisex-Extra-Large-Laptop-Backpack-for-Hiking-Climbing-Business-Trips-Waterproof-Black/15474970688",
+      "screenshot": "walmart-pdp-50l-full.png",
+      "visible_text_dump": "walmart-pdp-50l-text.txt",
+      "product": {
+        "external_id": "15474970688",
+        "brand": "Muzpu",
+        "title": "Travel Backpack 50L New Premium - Unisex Extra Large Laptop Backpack for Hiking, Climbing & Business Trips, Waterproof, Black",
+        "price": 31.49,
+        "was_price": 58.99,
+        "currency": "USD",
+        "rating": 4.5,
+        "review_count": 943,
+        "badges": [
+          "In 200+ people's carts",
+          "Flash Deal",
+          "Best seller"
+        ],
+        "capacity_liters": 50,
+        "colors_shown": [
+          "Black",
+          "Gray",
+          "Green",
+          "Pink"
+        ],
+        "attributes_ground_truth_hints": {
+          "waterproof": "claimed_in_title_and_bullets",
+          "capacity_liters": 50,
+          "category": "bags",
+          "note": "Keyword-stuffed title; treat waterproof claim as decoy risk until verified"
+        }
+      },
+      "surrounding_chrome": {
+        "above_fold": [
+          "Sparky AI shopping assistant entry",
+          "Spanish language callout",
+          "24-image gallery + audio overview 1:08",
+          "Flash Deal / Best seller / social proof carts badge",
+          "was/now price with color variants each showing both prices"
+        ],
+        "content_sections": [
+          "Key item features (AI-generated disclaimer)",
+          "Reviews summary",
+          "Similar items you might like (Best seller carousels with was/now and +$shipping)",
+          "Sponsored / options-from pricing on adjacent tiles"
+        ],
+        "noise_for_agents": [
+          "AI-generated feature bullets",
+          "title claims Waterproof while adjacent tiles say Water-Resistant",
+          "was price anchors perceived deal",
+          "similar-items rail competes with primary Buy box",
+          "optional shipping add-ons on related SKUs"
+        ]
+      }
+    }
+  ],
+  "plp_subset_snapshots": [
+    {
+      "capture_id": "rei-plp-rain-jackets",
+      "source_retailer": "rei",
+      "url": "https://www.rei.com/c/mens-rain-jackets",
+      "screenshot": "rei-plp-capture.png",
+      "visible_text_dump": "rei-plp-visible-text.txt",
+      "result_count": 106,
+      "sample_tiles": [
+        {
+          "title": "Patagonia Torrentshell 3L Jacket - Men's",
+          "price": "$189.00",
+          "rating": 4.4,
+          "reviews": 342
+        },
+        {
+          "title": "REI Co-op Rainier Rain Jacket - Men's",
+          "price": "$99.95",
+          "rating": 4.1,
+          "reviews": 454
+        },
+        {
+          "title": "Arc'teryx Beta Jacket - Men's",
+          "price": "$400.00",
+          "rating": 4.2,
+          "reviews": 186
+        },
+        {
+          "title": "REI Co-op Trailmade Rain Jacket - Men's",
+          "price": "$79.95",
+          "rating": 4.7,
+          "reviews": 6
+        }
+      ],
+      "surrounding_chrome": [
+        "promo carousel (4 rotating membership/outlet messages)",
+        "Store pickup (14) vs Ship to Address (106)",
+        "Filters: Categories, Brand, Size, Deals, Features, Price, Featured Technologies, Color, Best Use, Ventilation, Rating, Hood, Size Type, Gender, Back Length, Fabric Pattern/Type, Product Line, Sustainability",
+        "Sort By: Best Match / Price / Customer Rating",
+        "per tile: gallery scroller, Compare checkbox, feature chips, rating+count"
+      ]
+    },
+    {
+      "capture_id": "target-search-waterproof-backpack",
+      "source_retailer": "target",
+      "url": "https://www.target.com/s?searchTerm=waterproof+backpack",
+      "screenshot": "target-search-capture.png",
+      "visible_text_dump": "target-search-text.txt",
+      "result_count": 957,
+      "sample_tiles": [
+        {
+          "title": "Open Story\u2122 35L Travel Backpack",
+          "price": "$50.00",
+          "badges": [
+            "900+ bought",
+            "New at Target"
+          ],
+          "rating": 5.0,
+          "reviews": 1
+        },
+        {
+          "title": "All In Motion\u2122 14L Faux Neoprene Backpack",
+          "price": "$32.00 - $40.00",
+          "badges": [
+            "2k+ bought",
+            "clearance"
+          ],
+          "rating": 4.6,
+          "reviews": 380
+        },
+        {
+          "title": "SWISSGEAR Laptop Backpack",
+          "price": "$34.99 - $48.99",
+          "was": "$69.99",
+          "badges": [
+            "Clearance"
+          ],
+          "rating": 4.7,
+          "reviews": 43
+        },
+        {
+          "title": "JanSport All Around 28L Water Resistant Backpack",
+          "price": "$99.99",
+          "badges": [
+            "1k+ bought"
+          ],
+          "rating": 5.0,
+          "reviews": 8
+        }
+      ],
+      "surrounding_chrome": [
+        "ZIP + store chooser",
+        "chips: Pickup / Same-day Delivery / Shipping / Shop in store / Deals / Brand / \u2026",
+        "per tile: bought-last-month, clearance, See price in cart, color counts, shipping ETA, Add to cart, favorite"
+      ]
+    },
+    {
+      "capture_id": "walmart-search-waterproof-backpack",
+      "source_retailer": "walmart",
+      "url": "https://www.walmart.com/search?q=waterproof+backpack",
+      "screenshot": "walmart-search-capture.png",
+      "visible_text_dump": "walmart-search-text.txt",
+      "sample_tiles": [
+        {
+          "title": "Travel Backpack 50L \u2026 Waterproof",
+          "price": "$31.49",
+          "was": "$58.99",
+          "badges": [
+            "In 200+ carts",
+            "Flash Deal"
+          ]
+        },
+        {
+          "title": "Unisex 17\" Aurora Core Backpack",
+          "price": "$15.97",
+          "badges": [
+            "Overall pick"
+          ]
+        },
+        {
+          "title": "Ozark Trail Travel Backpack 30L",
+          "price": "$29.76",
+          "badges": []
+        },
+        {
+          "title": "40L Packable Hiking Backpack",
+          "price": "$25.19",
+          "was": "$27.99",
+          "badges": [
+            "Flash Deal"
+          ]
+        }
+      ],
+      "surrounding_chrome": [
+        "Pickup or delivery location",
+        "All deals switch + Brand/Price/Rating/Features/Volume Capacity facets",
+        "suggested chips: Roll Top / Travel / Hiking / Packable / USB Charging\u2026",
+        "per tile: was/now, Options from $X, color expanders, favorites gated on sign-in, +$ shipping"
+      ]
+    }
+  ],
+  "mock_store_densify_checklist": [
+    {
+      "zone": "promo_rail",
+      "recreate": "2\u20134 rotating non-answer banners (membership, outlet, card rewards)"
+    },
+    {
+      "zone": "fulfillment_chooser",
+      "recreate": "Pickup vs ship vs same-day; store name; ETA; not-sold-here"
+    },
+    {
+      "zone": "filter_rail",
+      "recreate": "\u22658 facets with counts (brand, size, price, waterproof, tech, deals, rating, sustainability)"
+    },
+    {
+      "zone": "tile_badges",
+      "recreate": "sponsored/new/clearance/bought-N/flash deal/staff pick/overall pick"
+    },
+    {
+      "zone": "price_chrome",
+      "recreate": "was/now, ranges, See price in cart, Options from, financing"
+    },
+    {
+      "zone": "buy_box_upsells",
+      "recreate": "membership checkbox, Circle/rewards estimate, wishlist/compare"
+    },
+    {
+      "zone": "gallery",
+      "recreate": "multi-image + model size captions"
+    },
+    {
+      "zone": "specs_and_features",
+      "recreate": "long feature bullets + technical specs table"
+    },
+    {
+      "zone": "social_proof",
+      "recreate": "reviews + Q&A + helpful votes + recommend %"
+    },
+    {
+      "zone": "related_rails",
+      "recreate": "similar items / discover more with competing prices"
+    },
+    {
+      "zone": "decoy_copy",
+      "recreate": "keyword Waterproof in title while attribute false or water-resistant"
+    }
+  ]
+}

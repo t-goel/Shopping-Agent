@@ -1,0 +1,137 @@
+{
+  "captured_at": "2026-10-31T03:10:00Z",
+  "method": "headed Chrome via chrome-use --launch (isolated profile)",
+  "note": "Structural observation only. Do not commit retailer product copy/images into catalog.json. Screenshots are private research evidence.",
+  "retailers": [
+    {
+      "retailer": "REI",
+      "reachable": true,
+      "pages": [
+        {
+          "kind": "PLP",
+          "url": "https://www.rei.com/c/mens-rain-jackets",
+          "screenshot": "rei-plp-mens-rain-jackets.png",
+          "listings_visible": true,
+          "sample_cards": [
+            {
+              "title": "Patagonia Torrentshell 3L Jacket - Men's",
+              "price": "$189.00",
+              "rating": "4.4",
+              "review_count": 342,
+              "feature_chips": ["Waterproof", "Packable"]
+            },
+            {
+              "title": "REI Co-op Rainier Rain Jacket - Men's",
+              "price": "$99.95",
+              "rating": "4.1",
+              "review_count": 454,
+              "feature_chips": ["Waterproof", "HydroWall"]
+            },
+            {
+              "title": "Arc'teryx Beta Jacket - Men's",
+              "price": "$400.00",
+              "rating": "4.2",
+              "review_count": 186,
+              "feature_chips": ["GORE-TEX", "Waterproof"]
+            }
+          ],
+          "clutter": [
+            "promo carousel (Outlet deals, Co-op Member $30 card, Mastercard rewards)",
+            "store pickup vs ship-to-address filters with counts",
+            "dense left nav filters: brand, size, deals, features, price, tech (GORE-TEX/DryVent), color, best use, ventilation, rating, hood, size type, gender, back length, fabric, product line, sustainability",
+            "sort: Best Match / Price / Customer Rating",
+            "per-tile: image gallery scroller, Compare checkbox, feature chips, rating+count"
+          ]
+        },
+        {
+          "kind": "PDP",
+          "url": "https://www.rei.com/product/215514/patagonia-torrentshell-3l-jacket-mens",
+          "screenshot": "rei-pdp-torrentshell.png",
+          "clutter": [
+            "same promo carousel as PLP",
+            "image gallery with model height/waist/size captions",
+            "brand link + 342 reviews / 4.4 rating anchor",
+            "many color swatches",
+            "size chart, qty stepper",
+            "Ship to address FREE vs Co-op Member Reward",
+            "upsell checkbox: lifetime membership $30",
+            "Add to cart + return policy",
+            "Technical Specs section",
+            "membership value math upsell ($18 reward + $30 bonus card)",
+            "Reviews (fit rating, helpful/critical, vote helpful)",
+            "Q&A (size advice, waterproof rating questions, restock)"
+          ]
+        }
+      ],
+      "raw_http_without_browser": "timeout / blocked"
+    },
+    {
+      "retailer": "Target",
+      "reachable": true,
+      "pages": [
+        {
+          "kind": "search",
+          "url": "https://www.target.com/s?searchTerm=waterproof+backpack",
+          "screenshot": "target-search-waterproof-backpack.png",
+          "listings_visible": true,
+          "clutter": [
+            "Ship to ZIP + store chooser (Champaign Campustown)",
+            "fulfillment chips: Pickup / Same-day Delivery / Shipping / Shop in store / Deals / Brand / features / color",
+            "social-proof badges: '900+ bought in last month', 'Highly rated', 'New at Target', 'Clearance', 'See price in cart'",
+            "per tile: price or price range, star rating + review count, color count, shipping ETA, free-shipping callouts",
+            "email capture footer"
+          ]
+        }
+      ],
+      "raw_http_without_browser": "200 but category deep-links can soft-redirect (backpacks URL returned Women's Shorts shell once)"
+    },
+    {
+      "retailer": "Walmart",
+      "reachable": true,
+      "pages": [
+        {
+          "kind": "search",
+          "url": "https://www.walmart.com/search?q=waterproof+backpack",
+          "screenshot": "walmart-search-waterproof-backpack.png",
+          "listings_visible": true,
+          "clutter": [
+            "Pickup or delivery location chooser",
+            "Sort/filter + All deals switch",
+            "badges: Overall pick, Best seller, Flash Deal, Clearance, In N+ people's carts",
+            "was/now prices, Options from $X, color option expanders",
+            "favorites require sign-in",
+            "shipping ETA / free shipping / +$ shipping add-ons",
+            "keyword-stuffed long titles (waterproof / travel / hiking / laptop)"
+          ]
+        }
+      ],
+      "raw_http_without_browser": "not heavily tested; browser session worked"
+    },
+    {
+      "retailer": "Amazon",
+      "reachable": false,
+      "pages": [
+        {
+          "kind": "search",
+          "url": "https://www.amazon.com/s?k=waterproof+rain+jacket+men",
+          "screenshot": "amazon-search-blocked.png",
+          "listings_visible": false,
+          "error": "Sorry! Something went wrong on our end."
+        }
+      ],
+      "raw_http_without_browser": "blocked / 403 class defenses"
+    },
+    {
+      "retailer": "Patagonia / Backcountry (HTTP probe only)",
+      "reachable": false,
+      "pages": [],
+      "raw_http_without_browser": "Patagonia ~3KB shell (JS/bot wall); Backcountry 202 empty body"
+    },
+    {
+      "retailer": "Hydrogen mock.shop",
+      "reachable": true,
+      "pages": [],
+      "raw_http_without_browser": "200 OK — permitted demo store, not a real retailer catalog"
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+{
+  "ingest_version": "ingest-v1",
+  "catalog_bootstrap": "catalog-v2",
+  "notes": "Bootstrap partition: projects today's catalog-v2 SKUs into 5 stores. Overlap SKUs share product_id; only price/stock/sponsored differ. Decoys and specialty uniques are single-store.",
+  "stores": [
+    {
+      "store_id": "trailworks-direct",
+      "name": "Trailworks Direct",
+      "brand_seller": "Trailworks",
+      "blurb": "House outdoor brand shop; also lists River Gear specialty."
+    },
+    {
+      "store_id": "metrowear",
+      "name": "Metrowear",
+      "brand_seller": "Metrowear",
+      "blurb": "City lifestyle; sponsored placements and water-resistant decoys."
+    },
+    {
+      "store_id": "clearance-corner",
+      "name": "Clearance Corner Outpost",
+      "brand_seller": "Clearance Corner",
+      "blurb": "Reseller copies plus a few genuine overpriced overlaps."
+    },
+    {
+      "store_id": "summit-outfitters",
+      "name": "Summit Outfitters",
+      "brand_seller": "Summit Outfitters",
+      "blurb": "Premium outdoor; overlaps Trailworks winners at higher prices."
+    },
+    {
+      "store_id": "headwater-supply",
+      "name": "Headwater Supply",
+      "brand_seller": "Headwater Supply",
+      "blurb": "Expedition and specialty; unique duffels, winter, Umbra."
+    }
+  ],
+  "overlap_rules": {
+    "identity": "product_id is global; attributes/reviews/seller never store-local",
+    "assortment_key": ["store_id", "product_id"],
+    "listing_id_format": "{store_id}:{product_id}",
+    "overlap_means": "same product_id in >=2 assortment rows",
+    "unique_means": "exactly one assortment row",
+    "decoys_unique": true,
+    "specialty_unique": true,
+    "price_may_differ_across_stores": true,
+    "stock_may_differ_across_stores": true
+  },
+  "assortment": [
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "ridge-shell",
+      "price": 89.0,
+      "stock": 4,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:ridge-shell",
+      "role": "overlap"
+    },
+    {
+      "store_id": "summit-outfitters",
+      "product_id": "ridge-shell",
+      "price": 94.0,
+      "stock": 3,
+      "sponsored": false,
+      "listing_id": "summit-outfitters:ridge-shell",
+      "role": "overlap"
+    },
+    {
+      "store_id": "clearance-corner",
+      "product_id": "ridge-shell",
+      "price": 99.0,
+      "stock": 2,
+      "sponsored": false,
+      "listing_id": "clearance-corner:ridge-shell",
+      "role": "overlap"
+    },
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "harbor-backpack",
+      "price": 64.0,
+      "stock": 4,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:harbor-backpack",
+      "role": "overlap"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "harbor-backpack",
+      "price": 69.0,
+      "stock": 1,
+      "sponsored": false,
+      "listing_id": "metrowear:harbor-backpack",
+      "role": "overlap"
+    },
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "tarn-fell",
+      "price": 91.0,
+      "stock": 6,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:tarn-fell",
+      "role": "overlap"
+    },
+    {
+      "store_id": "headwater-supply",
+      "product_id": "tarn-fell",
+      "price": 88.0,
+      "stock": 4,
+      "sponsored": false,
+      "listing_id": "headwater-supply:tarn-fell",
+      "role": "overlap"
+    },
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "ridge-pack",
+      "price": 39.0,
+      "stock": 5,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:ridge-pack",
+      "role": "unique"
+    },
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "river-shell",
+      "price": 79.0,
+      "stock": 1,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:river-shell",
+      "role": "unique"
+    },
+    {
+      "store_id": "trailworks-direct",
+      "product_id": "granite-hiker",
+      "price": 127.0,
+      "stock": 4,
+      "sponsored": false,
+      "listing_id": "trailworks-direct:granite-hiker",
+      "role": "unique"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "city-windbreaker",
+      "price": 49.0,
+      "stock": 8,
+      "sponsored": true,
+      "listing_id": "metrowear:city-windbreaker",
+      "role": "unique"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "canyon-pack",
+      "price": 58.0,
+      "stock": 7,
+      "sponsored": false,
+      "listing_id": "metrowear:canyon-pack",
+      "role": "unique"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "meadow-sling",
+      "price": 29.0,
+      "stock": 12,
+      "sponsored": true,
+      "listing_id": "metrowear:meadow-sling",
+      "role": "unique"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "peak-quest-ultra",
+      "price": 74.0,
+      "stock": 10,
+      "sponsored": true,
+      "listing_id": "metrowear:peak-quest-ultra",
+      "role": "unique"
+    },
+    {
+      "store_id": "metrowear",
+      "product_id": "fogbank-moc",
+      "price": 39.0,
+      "stock": 8,
+      "sponsored": false,
+      "listing_id": "metrowear:fogbank-moc",
+      "role": "unique"
+    },
+    {
+      "store_id": "clearance-corner",
+      "product_id": "ridge-shell-reseller",
+      "price": 69.0,
+      "stock": 6,
+      "sponsored": false,
+      "listing_id": "clearance-corner:ridge-shell-reseller",
+      "role": "unique"
+    },
+    {
+      "store_id": "clearance-corner",
+      "product_id": "ridge-pack-reseller",
+      "price": 42.0,
+      "stock": 6,
+      "sponsored": false,
+      "listing_id": "clearance-corner:ridge-pack-reseller",
+      "role": "unique"
+    },
+    {
+      "store_id": "summit-outfitters",
+      "product_id": "summit-shell",
+      "price": 119.0,
+      "stock": 3,
+      "sponsored": false,
+      "listing_id": "summit-outfitters:summit-shell",
+      "role": "unique"
+    },
+    {
+      "store_id": "summit-outfitters",
+      "product_id": "basalt-carryall",
+      "price": 96.0,
+      "stock": 2,
+      "sponsored": false,
+      "listing_id": "summit-outfitters:basalt-carryall",
+      "role": "unique"
+    },
+    {
+      "store_id": "summit-outfitters",
+      "product_id": "swale-runner",
+      "price": 81.0,
+      "stock": 3,
+      "sponsored": false,
+      "listing_id": "summit-outfitters:swale-runner",
+      "role": "unique"
+    },
+    {
+      "store_id": "headwater-supply",
+      "product_id": "headwater-duffel",
+      "price": 149.0,
+      "stock": 3,
+      "sponsored": false,
+      "listing_id": "headwater-supply:headwater-duffel",
+      "role": "unique"
+    },
+    {
+      "store_id": "headwater-supply",
+      "product_id": "frostline-boot",
+      "price": 154.0,
+      "stock": 2,
+      "sponsored": false,
+      "listing_id": "headwater-supply:frostline-boot",
+      "role": "unique"
+    },
+    {
+      "store_id": "headwater-supply",
+      "product_id": "umbra-messenger",
+      "price": 71.0,
+      "stock": 6,
+      "sponsored": false,
+      "listing_id": "headwater-supply:umbra-messenger",
+      "role": "unique"
+    },
+    {
+      "store_id": "headwater-supply",
+      "product_id": "cinder-hiker",
+      "price": 69.0,
+      "stock": 0,
+      "sponsored": false,
+      "listing_id": "headwater-supply:cinder-hiker",
+      "role": "unique"
+    }
+  ]
+}
