@@ -80,14 +80,15 @@ class ClaudeResponseError(RuntimeError):
 
 
 class Agent:
-    def __init__(self, api_key=None, model=None, max_turns=10):
+    def __init__(self, api_key=None, model=None, effort=None, max_turns=10):
         self.prompt_version = hashlib.sha256(
             (PROMPT + json.dumps(TOOLS, sort_keys=True)).encode()).hexdigest()
         self.input_tokens = None
         self.output_tokens = None
         self._missing_usage = set()
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
+        self.effort = effort or os.environ.get("ANTHROPIC_EFFORT", "high")
         self.max_turns = max_turns
         self.url = "https://api.anthropic.com/v1/messages"
 
@@ -168,10 +169,12 @@ class Agent:
         }
         payload = {
             "model": self.model,
-            "max_tokens": 2048,
+            # Thinking counts toward max_tokens on Haiku 5.5; leave room at high effort.
+            "max_tokens": 8192,
             "system": PROMPT,
             "tools": TOOLS,
             "messages": messages,
+            "output_config": {"effort": self.effort},
         }
         response = requests.post(self.url, headers=headers, json=payload, timeout=30)
         if response.status_code != 200:
