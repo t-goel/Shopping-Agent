@@ -13,8 +13,12 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
 FRONTEND = ROOT / "mock-store" / "storefront"
-API_URL = "http://127.0.0.1:8000/api/products"
-SHOP_URL = "http://localhost:5173"
+# Default loopback. Set HOST=0.0.0.0 (or another bind address) to listen on the LAN.
+BIND_HOST = os.environ.get("HOST", "127.0.0.1")
+API_PORT = 8000
+SHOP_PORT = 5173
+API_URL = f"http://127.0.0.1:{API_PORT}/api/products"
+SHOP_URL = f"http://127.0.0.1:{SHOP_PORT}"
 NPM = "npm.cmd" if os.name == "nt" else "npm"
 NODE = "node"
 
@@ -101,7 +105,7 @@ def main() -> int:
         api = subprocess.Popen(
             [
                 sys.executable, "-m", "uvicorn", "server.app:app",
-                "--app-dir", "mock-store", "--host", "127.0.0.1", "--port", "8000",
+                "--app-dir", "mock-store", "--host", BIND_HOST, "--port", str(API_PORT),
             ],
             cwd=ROOT,
             env=api_environment(),
@@ -111,8 +115,8 @@ def main() -> int:
 
         frontend = subprocess.Popen(
             [
-                NODE, "node_modules/vite/bin/vite.js", "--host", "127.0.0.1",
-                "--port", "5173", "--strictPort",
+                NODE, "node_modules/vite/bin/vite.js", "--host", BIND_HOST,
+                "--port", str(SHOP_PORT), "--strictPort",
             ],
             cwd=FRONTEND,
         )
@@ -120,6 +124,8 @@ def main() -> int:
         wait_until_ready(SHOP_URL, frontend, "Storefront")
 
         print(f"Shopping store is running at {SHOP_URL}")
+        if BIND_HOST not in {"127.0.0.1", "localhost"}:
+            print(f"Listening on {BIND_HOST} (override with HOST=...).")
         print("Press Ctrl+C to stop both servers.")
         webbrowser.open(SHOP_URL)
 
