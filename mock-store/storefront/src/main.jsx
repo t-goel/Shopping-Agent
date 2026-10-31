@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './styles.css';
 import {
   aboutBullets, bestSellerBadge, boughtLabel, choiceBadge, colorVariants,
-  deliveryLines, discountPct, fbtIds, listPrice, productImages, resellerOffer,
+  deliveryLines, discountPct, FALLBACK_PRODUCT_IMAGE, fbtIds, listPrice, productImages, resellerOffer,
   reviewHistogram, sizeVariants, PHOTO_STREAM_CAPTIONS, sentimentData,
 } from './chrome.js';
 
@@ -761,7 +761,7 @@ function App() {
                     <li key={item.product_id}>
                       <div className="cart-thumb">
                         <img
-                          src={product ? productImages(product)[0] : '/images/pexels_17492073_backpack_trail.jpg'}
+                          src={product ? productImages(product)[0] : FALLBACK_PRODUCT_IMAGE}
                           alt=""
                         />
                       </div>
