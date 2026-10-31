@@ -1,0 +1,355 @@
+{
+  "version": "stores-v1",
+  "stores": [
+    {
+      "store_id": "trailworks-direct",
+      "name": "Trailworks Direct",
+      "brand_seller": "Trailworks",
+      "notes": "Chrome only. Overlapping outdoor core SKUs."
+    },
+    {
+      "store_id": "metrowear",
+      "name": "Metrowear",
+      "brand_seller": "Metrowear",
+      "notes": "Chrome only. Urban / sponsored decoys; harbor-backpack overlap."
+    },
+    {
+      "store_id": "clearance-corner",
+      "name": "Clearance Corner Outpost",
+      "brand_seller": "Clearance Corner",
+      "notes": "Chrome only. Reseller copies and keyword-stuffed near-misses."
+    },
+    {
+      "store_id": "summit-outfitters",
+      "name": "Summit Outfitters",
+      "brand_seller": "Summit Outfitters",
+      "notes": "Chrome only. Premium; ridge-shell overlap at higher price."
+    },
+    {
+      "store_id": "headwater-supply",
+      "name": "Headwater Supply",
+      "brand_seller": "Headwater Supply",
+      "notes": "Chrome only. Unique expedition bags."
+    }
+  ],
+  "products": [
+    {
+      "product_id": "ridge-shell",
+      "title": "Ridge Rain Shell",
+      "description": "Lightweight waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "currency": "USD",
+      "seller": "Trailworks",
+      "canonical_store_id": "trailworks-direct",
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r1",
+          "rating": 5,
+          "text": "Stayed dry on a long walk."
+        }
+      ],
+      "image_url": null
+    },
+    {
+      "product_id": "ridge-shell-reseller",
+      "title": "Ridge Rain Shell Waterproof Jacket Deal Waterproof",
+      "description": "A similar-looking water-resistant jacket; specifications do not claim waterproofing.",
+      "category": "jackets",
+      "currency": "USD",
+      "seller": "Clearance Corner",
+      "canonical_store_id": "clearance-corner",
+      "attributes": {
+        "waterproof": false,
+        "size": "M",
+        "color": "navy"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r2",
+          "rating": 2,
+          "text": "Not the same as the original shell."
+        }
+      ],
+      "image_url": null
+    },
+    {
+      "product_id": "harbor-backpack",
+      "title": "Harbor Dry Pack 22L",
+      "description": "Fully waterproof roll-top daypack with welded seams.",
+      "category": "bags",
+      "currency": "USD",
+      "seller": "Trailworks",
+      "canonical_store_id": "trailworks-direct",
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 22,
+        "color": "blue"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r3",
+          "rating": 5,
+          "text": "Nothing got damp inside after hours of rain."
+        }
+      ],
+      "image_url": null
+    },
+    {
+      "product_id": "meadow-sling",
+      "title": "Meadow Sling Pack Waterproof Everyday Bag Deal",
+      "description": "Water-resistant sling; splash protection only, not a waterproof bag.",
+      "category": "bags",
+      "currency": "USD",
+      "seller": "Metrowear",
+      "canonical_store_id": "metrowear",
+      "attributes": {
+        "waterproof": false,
+        "capacity_liters": 8,
+        "color": "olive"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r4",
+          "rating": 2,
+          "text": "Zip leaked; fabric not sealed."
+        }
+      ],
+      "image_url": null
+    },
+    {
+      "product_id": "headwater-duffel",
+      "title": "Headwater Expedition Duffel 55L",
+      "description": "Heavy-duty waterproof duffel for whitewater trips.",
+      "category": "bags",
+      "currency": "USD",
+      "seller": "Headwater Supply",
+      "canonical_store_id": "headwater-supply",
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 55,
+        "color": "yellow"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r5",
+          "rating": 5,
+          "text": "Worth it on a monsoon trip."
+        }
+      ],
+      "image_url": null
+    },
+    {
+      "product_id": "tarn-fell",
+      "title": "Tarn Fell Low Hiker",
+      "description": "Waterproof low-cut hiker with a rock plate underfoot.",
+      "category": "footwear",
+      "currency": "USD",
+      "seller": "River Gear",
+      "canonical_store_id": "trailworks-direct",
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "slate"
+      },
+      "reviews": [
+        {
+          "review_id": "ing-r6",
+          "rating": 4,
+          "text": "Dry feet over wet roots."
+        },
+        {
+          "review_id": "ing-r7",
+          "rating": 5,
+          "text": "No blisters straight from the box."
+        }
+      ],
+      "image_url": null
+    }
+  ],
+  "listings": [
+    {
+      "listing_id": "trailworks-direct:ridge-shell",
+      "store_id": "trailworks-direct",
+      "product_id": "ridge-shell",
+      "price": 89.0,
+      "stock": 4,
+      "sponsored": false,
+      "seller": "Trailworks",
+      "title": "Ridge Rain Shell",
+      "description": "Lightweight waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      }
+    },
+    {
+      "listing_id": "summit-outfitters:ridge-shell",
+      "store_id": "summit-outfitters",
+      "product_id": "ridge-shell",
+      "price": 94.0,
+      "stock": 3,
+      "sponsored": false,
+      "seller": "Trailworks",
+      "title": "Ridge Rain Shell",
+      "description": "Lightweight waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      }
+    },
+    {
+      "listing_id": "clearance-corner:ridge-shell",
+      "store_id": "clearance-corner",
+      "product_id": "ridge-shell",
+      "price": 99.0,
+      "stock": 2,
+      "sponsored": false,
+      "seller": "Trailworks",
+      "title": "Ridge Rain Shell",
+      "description": "Lightweight waterproof rain jacket with taped seams.",
+      "category": "jackets",
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      }
+    },
+    {
+      "listing_id": "clearance-corner:ridge-shell-reseller",
+      "store_id": "clearance-corner",
+      "product_id": "ridge-shell-reseller",
+      "price": 69.0,
+      "stock": 6,
+      "sponsored": false,
+      "seller": "Clearance Corner",
+      "title": "Ridge Rain Shell Waterproof Jacket Deal Waterproof",
+      "description": "A similar-looking water-resistant jacket; specifications do not claim waterproofing.",
+      "category": "jackets",
+      "attributes": {
+        "waterproof": false,
+        "size": "M",
+        "color": "navy"
+      }
+    },
+    {
+      "listing_id": "trailworks-direct:tarn-fell",
+      "store_id": "trailworks-direct",
+      "product_id": "tarn-fell",
+      "price": 91.0,
+      "stock": 6,
+      "sponsored": false,
+      "seller": "River Gear",
+      "title": "Tarn Fell Low Hiker",
+      "description": "Waterproof low-cut hiker with a rock plate underfoot.",
+      "category": "footwear",
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "slate"
+      }
+    },
+    {
+      "listing_id": "headwater-supply:tarn-fell",
+      "store_id": "headwater-supply",
+      "product_id": "tarn-fell",
+      "price": 88.0,
+      "stock": 4,
+      "sponsored": false,
+      "seller": "River Gear",
+      "title": "Tarn Fell Low Hiker",
+      "description": "Waterproof low-cut hiker with a rock plate underfoot.",
+      "category": "footwear",
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "slate"
+      }
+    },
+    {
+      "listing_id": "trailworks-direct:harbor-backpack",
+      "store_id": "trailworks-direct",
+      "product_id": "harbor-backpack",
+      "price": 64.0,
+      "stock": 4,
+      "sponsored": false,
+      "seller": "Trailworks",
+      "title": "Harbor Dry Pack 22L",
+      "description": "Fully waterproof roll-top daypack with welded seams.",
+      "category": "bags",
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 22,
+        "color": "blue"
+      }
+    },
+    {
+      "listing_id": "metrowear:harbor-backpack",
+      "store_id": "metrowear",
+      "product_id": "harbor-backpack",
+      "price": 69.0,
+      "stock": 1,
+      "sponsored": false,
+      "seller": "Trailworks",
+      "title": "Harbor Dry Pack 22L",
+      "description": "Fully waterproof roll-top daypack with welded seams.",
+      "category": "bags",
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 22,
+        "color": "blue"
+      }
+    },
+    {
+      "listing_id": "metrowear:meadow-sling",
+      "store_id": "metrowear",
+      "product_id": "meadow-sling",
+      "price": 29.0,
+      "stock": 12,
+      "sponsored": true,
+      "seller": "Metrowear",
+      "title": "Meadow Sling Pack Waterproof Everyday Bag Deal",
+      "description": "Water-resistant sling; splash protection only, not a waterproof bag.",
+      "category": "bags",
+      "attributes": {
+        "waterproof": false,
+        "capacity_liters": 8,
+        "color": "olive"
+      }
+    },
+    {
+      "listing_id": "headwater-supply:headwater-duffel",
+      "store_id": "headwater-supply",
+      "product_id": "headwater-duffel",
+      "price": 149.0,
+      "stock": 3,
+      "sponsored": false,
+      "seller": "Headwater Supply",
+      "title": "Headwater Expedition Duffel 55L",
+      "description": "Heavy-duty waterproof duffel for whitewater trips.",
+      "category": "bags",
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 55,
+        "color": "yellow"
+      }
+    }
+  ],
+  "meta": {
+    "ingest_version": "ingest-v1",
+    "listing_count": 10,
+    "overlap_product_ids": [
+      "harbor-backpack",
+      "ridge-shell",
+      "tarn-fell"
+    ]
+  }
+}

@@ -30,6 +30,7 @@ class Claim(Contract):
 
 class AgentOutput(Contract):
     selected_product_ids: list[str] = Field(default_factory=list)
+    selected_listing_ids: list[str] = Field(default_factory=list)
     response_text: str
     claims: list[Claim] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)

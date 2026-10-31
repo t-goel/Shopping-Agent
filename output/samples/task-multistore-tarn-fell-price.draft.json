@@ -1,0 +1,46 @@
+{
+  "task_id": "multistore_cheapest_size9_waterproof_hiker",
+  "version": "stores-v1-draft",
+  "catalog_version": "stores-v1",
+  "difficulty": "medium",
+  "agent_surface": "structured",
+  "notes": "DRAFT — exploration only. Winner is headwater-supply:tarn-fell ($88), not trailworks-direct:tarn-fell ($91). seller stays River Gear on both; store_id is the differentiator.",
+  "request": {
+    "original_text": "I need the cheapest waterproof size-9 hiking shoe. Look across stores.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "footwear",
+        "hard": true
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true,
+        "hard": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "9",
+        "hard": true
+      }
+    ],
+    "preferences": [],
+    "clarification_needed": null
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": ["tarn-fell"],
+    "valid_listing_ids": ["headwater-supply:tarn-fell"],
+    "question_contains": null
+  },
+  "mutations": [],
+  "tool_surface": {
+    "list_stores": true,
+    "search_requires_store_id": true,
+    "cart_keys_on": "listing_id"
+  }
+}

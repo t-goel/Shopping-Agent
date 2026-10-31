@@ -65,6 +65,8 @@ class CartItem(BaseModel):
     unit_price: float
     line_total: float
     in_stock: bool
+    listing_id: str | None = None
+    store_id: str | None = None
 
 
 class Cart(BaseModel):
