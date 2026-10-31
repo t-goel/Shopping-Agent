@@ -17,10 +17,10 @@ from shopping_agent.contracts import (
 )
 from shopping_agent.example_checks import expected_listings
 from shopping_agent.ingest import load_ingest
-from server.state import Cart, CartItem, StoreError
+from server.state import Cart, CartItem, StoreError, product_matches_query
 
 ROOT = Path(__file__).resolve().parents[2]
-INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.sample.json"
+INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.example.json"
 STORES_TASKS_PATH = ROOT / "data/tasks/stores"
 
 
@@ -157,7 +157,9 @@ class MultiStore:
             image_url=product.image_url,
         )
 
-    def search(self, store_id: str, query: str = "", limit: int = 20) -> list[Product]:
+    def search(
+        self, query: str = "", limit: int = 20, store_id: str | None = None
+    ) -> list[Product]:
         """Search products within a specific store. Requires store_id."""
         with self._lock:
             self._apply_due_mutations()
@@ -166,21 +168,12 @@ class MultiStore:
             if store_id not in self.stores:
                 raise StoreError(f"unknown store_id: {store_id}", 400)
 
-            terms = query.casefold().split()
             matched: list[AssortmentRow] = []
             for listing in self.listings.values():
                 if listing.store_id != store_id:
                     continue
-                product = self.products[listing.product_id]
-                hay = " ".join(
-                    [
-                        product.title,
-                        product.description or "",
-                        product.category,
-                        *[str(v) for v in product.attributes.values()],
-                    ]
-                ).casefold()
-                if terms and not all(term in hay for term in terms):
+                product = self.as_product_view(listing)
+                if not product_matches_query(product, query):
                     continue
                 matched.append(listing)
 
@@ -198,33 +191,24 @@ class MultiStore:
             self.observations += 1
             return listing.model_copy(deep=True)
 
-    def get_product(
-        self, store_id_or_product_id: str, product_id: str | None = None
-    ) -> Product:
-        """Get product view by (store_id, product_id) or fallback to canonical store."""
+    def get_product(self, product_id: str, store_id: str | None = None) -> Product:
+        """Get product view by (store_id, product_id) or canonical store when store_id omitted."""
         with self._lock:
             self._apply_due_mutations()
-            if product_id is None:
-                pid = store_id_or_product_id
-                product = self.products.get(pid)
+            if store_id is None:
+                product = self.products.get(product_id)
                 if product is None:
                     raise StoreError("product not found", 404)
-                listing_id = listing_id_for(product.canonical_store_id, pid)
-                listing = self.listings.get(listing_id)
-                if listing is None:
-                    raise StoreError("listing not found", 404)
-                self.observations += 1
-                return self.as_product_view(listing)
+                listing_id = listing_id_for(product.canonical_store_id, product_id)
             else:
-                store_id = store_id_or_product_id
                 if store_id not in self.stores:
                     raise StoreError(f"unknown store_id: {store_id}", 400)
                 listing_id = listing_id_for(store_id, product_id)
-                listing = self.listings.get(listing_id)
-                if listing is None:
-                    raise StoreError("listing not found", 404)
-                self.observations += 1
-                return self.as_product_view(listing)
+            listing = self.listings.get(listing_id)
+            if listing is None:
+                raise StoreError("listing not found", 404)
+            self.observations += 1
+            return self.as_product_view(listing)
 
     def get_cart(self) -> Cart:
         """Get current cart keyed by listing_id."""
@@ -247,28 +231,27 @@ class MultiStore:
 
     def add_to_cart(
         self,
-        listing_id: str | None = None,
         product_id: str | None = None,
         quantity: int = 1,
+        *,
+        listing_id: str | None = None,
         store_id: str | None = None,
     ) -> Cart:
-        """Add to cart using listing_id or (store_id, product_id)."""
+        """Add to cart using listing_id or (store_id, product_id). No silent canonical fallback."""
         with self._lock:
             self._apply_due_mutations()
             if quantity < 1:
                 raise StoreError("quantity must be positive", 422)
 
-            target_listing_id = listing_id
-            if not target_listing_id:
-                if store_id and product_id:
-                    target_listing_id = listing_id_for(store_id, product_id)
-                elif product_id:
-                    prod = self.products.get(product_id)
-                    if prod is None:
-                        raise StoreError("product not found", 404)
-                    target_listing_id = listing_id_for(prod.canonical_store_id, product_id)
-                else:
-                    raise StoreError("listing_id or product_id required", 422)
+            if listing_id:
+                target_listing_id = listing_id
+            elif store_id and product_id:
+                target_listing_id = listing_id_for(store_id, product_id)
+            else:
+                raise StoreError(
+                    "listing_id or (store_id and product_id) required",
+                    422,
+                )
 
             listing = self.listings.get(target_listing_id)
             if listing is None:

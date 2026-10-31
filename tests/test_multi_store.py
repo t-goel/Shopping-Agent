@@ -27,7 +27,7 @@ from shopping_agent.interfaces import AgentOutput
 from shopping_agent.contracts import CatalogExample
 
 ROOT = Path(__file__).resolve().parents[1]
-INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.sample.json"
+INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.example.json"
 
 
 def test_ingest_load_and_canonical_compat_prices():
@@ -72,19 +72,19 @@ def test_store_scoped_search_and_validation():
     store = MultiStore(ingest, tasks)
 
     # Direct store search
-    tw_results = store.search("trailworks-direct", "waterproof")
+    tw_results = store.search("waterproof", store_id="trailworks-direct")
     assert any(p.product_id == "ridge-shell" and p.price == 89.0 for p in tw_results)
 
-    summit_results = store.search("summit-outfitters", "waterproof")
+    summit_results = store.search("waterproof", store_id="summit-outfitters")
     assert any(p.product_id == "ridge-shell" and p.price == 94.0 for p in summit_results)
 
     # Missing or unknown store_id raises StoreError 400
     with pytest.raises(StoreError) as exc_missing:
-        store.search("", "waterproof")
+        store.search("waterproof", store_id="")
     assert exc_missing.value.status == 400
 
     with pytest.raises(StoreError) as exc_unknown:
-        store.search("nonexistent-store", "waterproof")
+        store.search("waterproof", store_id="nonexistent-store")
     assert exc_unknown.value.status == 400
 
     # API endpoints
@@ -297,6 +297,30 @@ def test_multi_store_no_valid_product_scoring_does_not_crash():
         store.snapshot(),
     )
     assert ok
+
+
+def test_add_to_cart_requires_listing_or_store_pair():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+    with pytest.raises(StoreError) as exc:
+        store.add_to_cart(product_id="ridge-shell", quantity=1)
+    assert exc.value.status == 422
+
+    with TestClient(create_app(store)) as api:
+        assert (
+            api.post("/api/cart", json={"product_id": "ridge-shell", "quantity": 1}).status_code
+            == 422
+        )
+        ok = api.post(
+            "/api/cart",
+            json={
+                "product_id": "ridge-shell",
+                "store_id": "trailworks-direct",
+                "quantity": 1,
+            },
+        )
+        assert ok.status_code == 200
+        assert ok.json()["items"][0]["listing_id"] == "trailworks-direct:ridge-shell"
 
 
 def test_listing_aware_scoring_accepts_cheapest_store_only():

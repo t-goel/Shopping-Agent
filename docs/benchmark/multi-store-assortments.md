@@ -148,7 +148,7 @@ Shipped runtime (not under `output/`):
 
 | Piece | Path |
 |---|---|
-| Ingest sample | `mock-store/server/examples/ingest-v1.sample.json` |
+| Ingest example | `mock-store/server/examples/ingest-v1.example.json` |
 | Full bootstrap partition | `mock-store/server/examples/stores-partition-v1.json` |
 | Loader / projection | `src/shopping_agent/ingest.py` |
 | Multi-store runtime | `mock-store/server/multi_store.py` |

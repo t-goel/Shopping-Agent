@@ -23,9 +23,13 @@ class AddItem(BaseModel):
 
     @model_validator(mode="after")
     def check_identifier(self):
-        if not self.product_id and not self.listing_id:
-            raise ValueError("product_id or listing_id is required")
-        return self
+        if self.listing_id:
+            return self
+        if self.product_id and self.store_id:
+            return self
+        if self.product_id:
+            return self  # single-store cart path
+        raise ValueError("listing_id or product_id is required")
 
 
 class Listing(BaseModel):
@@ -84,6 +88,10 @@ def as_listing(
     )
 
 
+def _catalog_version(store: Store | MultiStore) -> str:
+    return store.catalog_version if isinstance(store, MultiStore) else store.catalog.version
+
+
 # Serve one injected trial store in tests or load versioned examples for local development.
 def create_app(store: Store | MultiStore | None = None) -> FastAPI:
     if store is None:
@@ -92,10 +100,7 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
 
     app = FastAPI(title="Mock shopping store", description="Local-only benchmark environment")
     app.state.store = store
-
-    catalog_version = (
-        store.catalog_version if isinstance(store, MultiStore) else store.catalog.version
-    )
+    catalog_version = _catalog_version(store)
 
     @app.exception_handler(StoreError)
     async def store_error(_request: Request, exc: StoreError):
@@ -103,9 +108,7 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
 
     @app.get("/api/stores", response_model=list[StoreRecord])
     def list_stores():
-        if isinstance(store, MultiStore):
-            return store.get_stores()
-        raise StoreError("stores endpoint not supported in single-store mode", 404)
+        return store.get_stores()
 
     @app.get("/api/stores/{store_id}/products", response_model=list[Listing])
     def search_store_products(
@@ -114,33 +117,31 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         q: str = Query(default="", max_length=200),
         limit: int = Query(default=20, ge=1, le=50),
     ):
-        if isinstance(store, MultiStore):
-            products = store.search(store_id, q, limit)
-            return [
-                as_listing(
-                    product,
-                    request,
-                    catalog_version,
-                    store_id=store_id,
-                    listing_id=listing_id_for(store_id, product.product_id),
-                )
-                for product in products
-            ]
-        raise StoreError("store-scoped search not supported on single-store", 404)
-
-    @app.get("/api/listings/{listing_id}", response_model=Listing)
-    def get_listing_by_id(listing_id: str, request: Request):
-        if isinstance(store, MultiStore):
-            listing = store.get_listing(listing_id)
-            product = store.as_product_view(listing)
-            return as_listing(
+        if not isinstance(store, MultiStore):
+            raise StoreError("store-scoped search not supported on single-store", 404)
+        products = store.search(q, limit, store_id=store_id)
+        return [
+            as_listing(
                 product,
                 request,
                 catalog_version,
-                store_id=listing.store_id,
-                listing_id=listing.listing_id,
+                store_id=store_id,
+                listing_id=listing_id_for(store_id, product.product_id),
             )
-        raise StoreError("listing endpoint not supported on single-store", 404)
+            for product in products
+        ]
+
+    @app.get("/api/listings/{listing_id}", response_model=Listing)
+    def get_listing_by_id(listing_id: str, request: Request):
+        listing = store.get_listing(listing_id)
+        product = store.as_product_view(listing)
+        return as_listing(
+            product,
+            request,
+            catalog_version,
+            store_id=listing.store_id,
+            listing_id=listing.listing_id,
+        )
 
     @app.get("/api/products", response_model=list[Listing])
     def search_products(
@@ -149,25 +150,17 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         limit: int = Query(default=20, ge=1, le=50),
         store_id: str | None = Query(default=None),
     ):
-        # Shared search surface: single-store ignores store_id; multi-store requires it
-        # (no federated search) so CatalogAPI.search(SearchInput) keeps working.
-        if isinstance(store, MultiStore):
-            if not store_id:
-                raise StoreError("search in multi-store mode requires store_id", 400)
-            products = store.search(store_id, q, limit)
-            return [
-                as_listing(
-                    product,
-                    request,
-                    catalog_version,
-                    store_id=store_id,
-                    listing_id=listing_id_for(store_id, product.product_id),
-                )
-                for product in products
-            ]
+        # Multi-store requires store_id (no federated search); single-store ignores it.
+        products = store.search(q, limit, store_id=store_id)
         return [
-            as_listing(product, request, store.catalog.version)
-            for product in store.search(q, limit)
+            as_listing(
+                product,
+                request,
+                catalog_version,
+                store_id=store_id,
+                listing_id=listing_id_for(store_id, product.product_id) if store_id else None,
+            )
+            for product in products
         ]
 
     @app.get("/api/products/{product_id}", response_model=Listing)
@@ -176,28 +169,23 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         request: Request,
         store_id: str | None = Query(default=None),
     ):
+        product = store.get_product(product_id, store_id=store_id)
+        resolved_store = store_id
+        lid = None
         if isinstance(store, MultiStore):
-            if store_id:
-                product = store.get_product(store_id, product_id)
-                lid = listing_id_for(store_id, product_id)
-            else:
-                product = store.get_product(product_id)
-                ingest_product = store.products[product_id]
-                store_id = ingest_product.canonical_store_id
-                lid = listing_id_for(store_id, product_id)
-            return as_listing(
-                product,
-                request,
-                store.catalog_version,
-                store_id=store_id,
-                listing_id=lid,
-            )
-        return as_listing(store.get_product(product_id), request, store.catalog.version)
+            if resolved_store is None:
+                resolved_store = store.products[product_id].canonical_store_id
+            lid = listing_id_for(resolved_store, product_id)
+        return as_listing(
+            product,
+            request,
+            catalog_version,
+            store_id=resolved_store,
+            listing_id=lid,
+        )
 
     @app.get("/api/products/{product_id}/reviews", response_model=list[Review])
     def get_reviews(product_id: str):
-        if isinstance(store, MultiStore):
-            return store.get_product(product_id).reviews
         return store.get_product(product_id).reviews
 
     @app.get("/api/cart", response_model=Cart)
@@ -206,16 +194,12 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
 
     @app.post("/api/cart", response_model=Cart)
     def add_to_cart(item: AddItem):
-        if isinstance(store, MultiStore):
-            return store.add_to_cart(
-                listing_id=item.listing_id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                store_id=item.store_id,
-            )
-        if not item.product_id:
-            raise StoreError("product_id is required", 422)
-        return store.add_to_cart(item.product_id, item.quantity)
+        return store.add_to_cart(
+            product_id=item.product_id,
+            quantity=item.quantity,
+            listing_id=item.listing_id,
+            store_id=item.store_id,
+        )
 
     # Keep control paths outside the storefront's /api development proxy.
     @app.post("/internal/reset")
