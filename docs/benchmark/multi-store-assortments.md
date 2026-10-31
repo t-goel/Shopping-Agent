@@ -159,12 +159,30 @@ Expanded peer sample (6 products / 10 listings): overlaps `ridge-shell`, `harbor
 
 **Compat rule:** use `canonical_store_id` for flat export (catalog-v2-stable), not cheapest-in-stock.
 
+## Per-store densify chrome (from scrape peer captures)
+
+Peer pack (not committed here; lives on `t3/scraped-catalog-feasibility` under gitignored `output/`):  
+`output/samples/retailer-captures/densify-reference-pack.json` + `densify-from-retailers.md`.
+
+Still **synthetic catalog ground truth** — captures are chrome inspiration only (no retailer CDN media in-repo).
+
+| Our `store_id` | Clutter style | Inspiration |
+|---|---|---|
+| `trailworks-direct` | membership, tech filters, staff pick, specs table | REI-like |
+| `summit-outfitters` | same outdoor density, premium bias | REI-like |
+| `metrowear` | fulfillment chips, Circle/financing, bought-last-month | Target-like |
+| `clearance-corner` | was/now, Flash Deal, keyword titles, noisy bullets | Walmart-like |
+| `headwater-supply` | expedition/specialty; lean REI-like specs | REI-like (narrower) |
+
+When multi-store UI densifies after PR #17, aim ~10–15 chrome blocks beyond title/price/ATC per PDP, using the pack’s `mock_store_densify_checklist`.
+
 ## Next steps
 
 1. ~~Peer sync + design lock~~
 2. ~~stores-v1 runtime + listing-aware scoring~~ — default NL suite still loads catalog-v2 only
-3. Optional: runner CLI flag for `--catalog stores-v1`; densified multi-store UI after PR #17
-4. Keep generated scratch under `output/` (gitignored)
+3. Optional: runner CLI flag for `--catalog stores-v1`
+4. Densified **per-store** UI chrome after PR #17, using the retailer capture pack as density reference
+5. Keep generated scratch under `output/` (gitignored)
 
 
 ## Design stress findings
