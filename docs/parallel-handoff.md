@@ -8,12 +8,13 @@ Implement `Agent.run(AgentInput, ShoppingTools) -> AgentOutput` from `shopping_a
 
 The current parsed request also supplies `clarification_needed`, including the exact question. The clarification pilot evaluates instruction routing, not ambiguity discovery. For comparative runs, choose and document one common input policy before testing: omit this directive when measuring model ambiguity detection, or supply identical parsed assistance to every condition and exclude discovery from the measured capability. Do not compare a raw-text model against this assisted baseline as if inputs were equivalent. Do not return success scores or pass an entire `TaskDefinition` to the agent.
 
-The four public operations are:
+The public shopping tools are:
 
-- `search(SearchInput) -> SearchResult`
-- `get_listing(product_id) -> ProductObservation`
-- `add_to_cart(CartSelection) -> CartObservation`
+- `search(SearchInput) -> SearchResult` (`SearchInput.store_id` required for stores-v1)
+- `get_listing(product_id=…, store_id=…, listing_id=…) -> ProductObservation`
+- `add_to_cart(CartSelection) -> CartObservation` (prefer `listing_id` / store+product on stores-v1)
 - `inspect_cart() -> CartObservation`
+- `list_stores() -> list[StoreRecord]` (stores-v1; 404 on single-store)
 
 Use fake implementations of this protocol to start independently. `BudgetedTools` wraps the implementation and counts attempted calls, including failed HTTP requests. Verification is local computation, not an additional network call. Expose an allowlist to your model; keep private reset/state access out of it. No full agent framework is required or used.
 

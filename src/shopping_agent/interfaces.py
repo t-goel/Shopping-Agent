@@ -5,7 +5,7 @@ from pydantic import Field
 
 from shopping_agent.contracts import (
     Attribute, CartSelection, Contract, EvidenceItem, ProductObservation,
-    SearchInput, SearchResult, ShoppingRequest,
+    SearchInput, SearchResult, ShoppingRequest, StoreRecord,
 )
 
 Termination = Literal[
@@ -30,6 +30,7 @@ class Claim(Contract):
 
 class AgentOutput(Contract):
     selected_product_ids: list[str] = Field(default_factory=list)
+    selected_listing_ids: list[str] = Field(default_factory=list)
     response_text: str
     claims: list[Claim] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
@@ -52,9 +53,16 @@ class CartObservation(Contract):
 
 class ShoppingTools(Protocol):
     def search(self, inputs: SearchInput) -> SearchResult: ...
-    def get_listing(self, product_id: str) -> ProductObservation: ...
+    def get_listing(
+        self,
+        product_id: str | None = None,
+        *,
+        store_id: str | None = None,
+        listing_id: str | None = None,
+    ) -> ProductObservation: ...
     def add_to_cart(self, selection: CartSelection) -> CartObservation: ...
     def inspect_cart(self) -> CartObservation: ...
+    def list_stores(self) -> list[StoreRecord]: ...
 
 
 class Agent(Protocol):

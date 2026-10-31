@@ -65,6 +65,8 @@ class CartItem(BaseModel):
     unit_price: float
     line_total: float
     in_stock: bool
+    listing_id: str | None = None
+    store_id: str | None = None
 
 
 class Cart(BaseModel):
@@ -77,6 +79,22 @@ class StoreError(Exception):
     def __init__(self, message: str, status: int):
         super().__init__(message)
         self.status = status
+
+
+def product_matches_query(product: Product, query: str) -> bool:
+    """True when every whitespace-separated query term appears in product text fields."""
+    terms = query.casefold().split()
+    if not terms:
+        return True
+    hay = " ".join(
+        [
+            product.title,
+            product.description or "",
+            product.category,
+            *[str(v) for v in product.attributes.values()],
+        ]
+    ).casefold()
+    return all(term in hay for term in terms)
 
 
 class Store:
@@ -115,25 +133,33 @@ class Store:
                     product.stock = mutation.stock
                 self.applied_mutations.add(index)
 
+    def get_stores(self):
+        raise StoreError("stores endpoint not supported in single-store mode", 404)
+
+    def get_listing(self, listing_id: str):
+        raise StoreError("listing endpoint not supported on single-store", 404)
+
+    def as_product_view(self, listing):
+        raise StoreError("listing endpoint not supported on single-store", 404)
+
     # Search the current catalog with all query words and a stable sponsored-first order.
-    def search(self, query: str = "", limit: int = 20) -> list[Product]:
+    def search(
+        self, query: str = "", limit: int = 20, store_id: str | None = None
+    ) -> list[Product]:
+        del store_id  # single-store ignores store scoping
         with self._lock:
             self._apply_due_mutations()
-            terms = query.casefold().split()
             matched = [
-                product for product in self.products.values()
-                if all(
-                    term in " ".join([
-                        product.title, product.description, product.category,
-                        *[str(v) for v in product.attributes.values()],
-                    ]).casefold() for term in terms
-                )
+                product
+                for product in self.products.values()
+                if product_matches_query(product, query)
             ]
             matched.sort(key=lambda p: (not p.sponsored, p.product_id))
             self.observations += 1
             return [p.model_copy(deep=True) for p in matched[:limit]]
 
-    def get_product(self, product_id: str) -> Product:
+    def get_product(self, product_id: str, store_id: str | None = None) -> Product:
+        del store_id  # single-store has no storefront identity
         with self._lock:
             self._apply_due_mutations()
             product = self.products.get(product_id)
@@ -157,8 +183,18 @@ class Store:
             ]
             return Cart(items=items, total=round(sum(item.line_total for item in items), 2))
 
-    def add_to_cart(self, product_id: str, quantity: int) -> Cart:
+    def add_to_cart(
+        self,
+        product_id: str | None = None,
+        quantity: int = 1,
+        *,
+        listing_id: str | None = None,
+        store_id: str | None = None,
+    ) -> Cart:
         """Check live stock and price before changing the cart; never place an order."""
+        del listing_id, store_id  # single-store carts are product-keyed
+        if not product_id:
+            raise StoreError("product_id is required", 422)
         with self._lock:
             self._apply_due_mutations()
             product = self.products.get(product_id)
