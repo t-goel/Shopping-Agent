@@ -29,9 +29,6 @@ def load_examples(
         if task.task_id in tasks:
             raise ValueError(f"duplicate task ID: {task.task_id}")
 
-        if task.catalog_version != catalog.version:
-            raise ValueError(f"{path}: catalog version mismatch")
-
         for constraint in task.request.constraints:
             if constraint.attribute not in known_attributes:
                 raise ValueError(f"{path}: unknown constraint attribute {constraint.attribute}")
@@ -99,7 +96,7 @@ class Store:
             self.cart: dict[str, int] = {}
             self.observations = 0
             self.applied_mutations: set[int] = set()
-            return {"task_id": task_id, "catalog_version": self.catalog.version}
+            return {"task_id": task_id}
 
     # Apply each scheduled price or stock change exactly once before the next interaction.
     def _apply_due_mutations(self) -> None:
@@ -180,7 +177,6 @@ class Store:
             self._apply_due_mutations()
             return {
                 "task_id": self.task_id,
-                "catalog_version": self.catalog.version,
                 "observations": self.observations,
                 "applied_mutations": sorted(self.applied_mutations),
                 "products": {key: value.model_dump(mode="json") for key, value in self.products.items()},

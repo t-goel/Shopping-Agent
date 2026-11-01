@@ -11,11 +11,9 @@ from shopping_agent.eval.report import (
 def trial(**overrides) -> TrialResult:
     base = dict(
         task_id="demo_task",
-        task_version="suite-v4",
-        catalog_version="catalog-v2",
         agent_name="claude",
         model_id=None,
-        prompt_version=None,
+        prompt_id=None,
         trial_number=1,
         mode="api",
         selected_product_ids=[],

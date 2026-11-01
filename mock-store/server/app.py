@@ -36,10 +36,9 @@ class Listing(BaseModel):
     image_url: str | None
     source_url: str
     observed_at: datetime
-    catalog_version: str
 
 
-def as_listing(product: Product, request: Request, catalog_version: str) -> Listing:
+def as_listing(product: Product, request: Request) -> Listing:
     return Listing(
         **product.model_dump(exclude={"reviews", "image_url"}),
         reviews=product.reviews,
@@ -50,11 +49,10 @@ def as_listing(product: Product, request: Request, catalog_version: str) -> List
         review_count=len(product.reviews),
         source_url=str(request.url_for("get_product", product_id=product.product_id)),
         observed_at=datetime.now(timezone.utc),
-        catalog_version=catalog_version,
     )
 
 
-# Serve one injected trial store in tests or load versioned examples for local development.
+# Serve one injected trial store in tests or load examples for local development.
 def create_app(store: Store | None = None) -> FastAPI:
     if store is None:
         catalog, tasks = load_examples()
@@ -73,14 +71,11 @@ def create_app(store: Store | None = None) -> FastAPI:
         q: str = Query(default="", max_length=200),
         limit: int = Query(default=20, ge=1, le=50),
     ):
-        return [
-            as_listing(product, request, store.catalog.version)
-            for product in store.search(q, limit)
-        ]
+        return [as_listing(product, request) for product in store.search(q, limit)]
 
     @app.get("/api/products/{product_id}", response_model=Listing)
     def get_product(product_id: str, request: Request):
-        return as_listing(store.get_product(product_id), request, store.catalog.version)
+        return as_listing(store.get_product(product_id), request)
 
     @app.get("/api/products/{product_id}/reviews", response_model=list[Review])
     def get_reviews(product_id: str):

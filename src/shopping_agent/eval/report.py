@@ -41,7 +41,7 @@ def failure_category(record):
 
 
 def _condition_parts(records: list[TrialResult]):
-    agents = {(r.agent_name, r.model_id, r.prompt_version) for r in records}
+    agents = {(r.agent_name, r.model_id, r.prompt_id) for r in records}
     surfaces = {r.run_metadata.get("agent_surface") for r in records}
     concrete_surfaces = {surface for surface in surfaces if surface is not None}
     return agents, concrete_surfaces
@@ -85,7 +85,7 @@ def summarize(records: list[TrialResult]):
     identity = {
         "agent_name": sample.agent_name if sample else None,
         "model_id": sample.model_id if sample else None,
-        "prompt_version": sample.prompt_version if sample else None,
+        "prompt_id": sample.prompt_id if sample else None,
         "agent_surface": surface,
     }
     return {
@@ -229,7 +229,7 @@ def markdown_report(records):
         "",
         f"- Agent: `{identity['agent_name']}`",
         f"- Model: `{identity['model_id']}`",
-        f"- Prompt: `{identity['prompt_version']}`",
+        f"- Prompt: `{identity['prompt_id']}`",
         f"- Input surface: `{identity['agent_surface']}`",
         f"- Tokens (input/output/total): "
         f"`{overall['input_tokens']}` / `{overall['output_tokens']}` / `{overall['model_tokens']}` "

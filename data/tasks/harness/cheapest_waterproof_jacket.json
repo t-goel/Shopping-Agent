@@ -1,7 +1,5 @@
 {
   "task_id": "cheapest_waterproof_jacket",
-  "version": "example-v1",
-  "catalog_version": "catalog-v2",
   "difficulty": "easy",
   "agent_surface": "structured",
   "request": {

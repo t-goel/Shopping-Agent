@@ -1,7 +1,5 @@
 {
   "task_id": "mutation_then_empty",
-  "version": "suite-v4",
-  "catalog_version": "catalog-v2",
   "difficulty": "hard",
   "agent_surface": "nl",
   "request": {

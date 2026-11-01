@@ -47,7 +47,6 @@ class CatalogAPI:
             product=product,
             source_url=data["source_url"],
             observed_at=data["observed_at"],
-            catalog_version=data["catalog_version"],
         )
 
     def search(self, inputs: SearchInput) -> SearchResult:

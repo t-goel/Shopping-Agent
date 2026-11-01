@@ -1,7 +1,5 @@
 {
   "task_id": "nl_cheapest_waterproof_daypack",
-  "version": "suite-v4",
-  "catalog_version": "catalog-v2",
   "difficulty": "easy",
   "agent_surface": "nl",
   "request": {

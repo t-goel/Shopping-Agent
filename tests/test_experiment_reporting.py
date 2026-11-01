@@ -32,7 +32,7 @@ def test_timeout_preserves_claude_identity_without_secrets():
                             agent=SlowClaude(api_key="test-secret", model="test-model"))
     assert result.agent_name == "claude"
     assert result.model_id == "test-model"
-    assert len(result.prompt_version) == 64
+    assert len(result.prompt_id) == 64
     assert result.termination_reason == "timeout"
     assert result.input_tokens is None
     assert "test-secret" not in result.model_dump_json()
@@ -117,7 +117,7 @@ def test_per_task_report_partial_usage_and_mixed_conditions():
     bad = run_trial(catalog, task, max_calls=1)
     report = summarize([good, bad])
     assert report["identity"]["agent_name"] == "rules"
-    assert report["identity"]["prompt_version"] == good.prompt_version
+    assert report["identity"]["prompt_id"] == good.prompt_id
     assert report["by_task"][task.task_id]["successful"] == 1
     assert report["by_difficulty"][task.difficulty]["trials"] == 2
     assert report["overall"]["failure_categories"] == {"max_tool_calls_exceeded": 1}
