@@ -70,7 +70,15 @@ class BudgetedTools:
         try:
             method = getattr(self._tools, name)
             result = method() if inputs is None else method(inputs)
-            event.observation = result.model_dump(mode="json")
+            if hasattr(result, "model_dump"):
+                event.observation = result.model_dump(mode="json")
+            elif isinstance(result, list):
+                event.observation = [
+                    item.model_dump(mode="json") if hasattr(item, "model_dump") else item
+                    for item in result
+                ]
+            else:
+                event.observation = result
 
         except Exception as exc:
             event.error = f"{type(exc).__name__}: {exc}"
@@ -90,11 +98,49 @@ class BudgetedTools:
     def search(self, inputs: SearchInput):
         return self._call("search", inputs)
 
-    def get_listing(self, product_id: str):
-        return self._call("get_listing", product_id)
+    def get_listing(
+        self,
+        product_id: str | None = None,
+        *,
+        store_id: str | None = None,
+        listing_id: str | None = None,
+    ):
+        if self._clock() >= self.deadline:
+            raise BudgetExceeded("timeout")
+        if len(self.trace) >= self.max_calls:
+            raise BudgetExceeded("max_tool_calls_exceeded")
+
+        serialized = {
+            "product_id": product_id,
+            "store_id": store_id,
+            "listing_id": listing_id,
+        }
+        event = ToolTrace(sequence=len(self.trace) + 1, name="get_listing", inputs=serialized)
+        self.trace.append(event)
+        if self._on_trace:
+            self._on_trace(event)
+        start = self._clock()
+        try:
+            result = self._tools.get_listing(
+                product_id, store_id=store_id, listing_id=listing_id
+            )
+            event.observation = result.model_dump(mode="json")
+        except Exception as exc:
+            event.error = f"{type(exc).__name__}: {exc}"
+            raise
+        finally:
+            event.duration_seconds = self._clock() - start
+            if self._on_trace:
+                self._on_trace(event)
+        if self._clock() >= self.deadline:
+            raise BudgetExceeded("timeout")
+        return result
 
     def add_to_cart(self, selection: CartSelection):
         return self._call("add_to_cart", selection)
 
     def inspect_cart(self):
         return self._call("inspect_cart", None)
+
+    def list_stores(self):
+        return self._call("list_stores", None)

@@ -18,9 +18,18 @@ def final(text, reason="end_turn"):
     return {"stop_reason": reason, "content": [{"type": "text", "text": text}]}
 
 
-def search(query):
+def search(query, store_id=None):
+    payload = {"query": query, "max_results": 50}
+    if store_id is not None:
+        payload["store_id"] = store_id
     return {"stop_reason": "tool_use", "content": [{
-        "type": "tool_use", "id": "search-1", "name": "search", "input": {"query": query, "max_results": 50},
+        "type": "tool_use", "id": "search-1", "name": "search", "input": payload,
+    }]}
+
+
+def list_stores():
+    return {"stop_reason": "tool_use", "content": [{
+        "type": "tool_use", "id": "stores-1", "name": "list_stores", "input": {},
     }]}
 
 
@@ -186,3 +195,26 @@ def test_completed_decision_keeps_claude_response_text():
     assert result.is_successful, result.model_dump()
     assert result.selected_product_ids == ["basalt-carryall"]
     assert result.response_text == "Basalt Carryall matches the ~30L waterproof need."
+
+
+def test_multi_store_claude_search_requires_store_id_and_carts_listing():
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    decision = '''{"status":"completed","product_id":"ridge-shell",
+      "listing_id":"trailworks-direct:ridge-shell","store_id":"trailworks-direct",
+      "response":"Trailworks Ridge Shell is the cheapest waterproof shell.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"jackets"},
+                     {"attribute":"waterproof","operator":"eq","value":true}],
+      "ranking_rule":"lowest_price","claims":[{"field":"price","value":89}]}'''
+    agent = ScriptedClaude([
+        list_stores(),
+        search("jackets", store_id="trailworks-direct"),
+        final(decision),
+    ])
+    result = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"], agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.selected_product_ids == ["ridge-shell"]
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+    assert result.tool_trace[0]["name"] == "list_stores"
+    assert result.tool_trace[1]["inputs"]["store_id"] == "trailworks-direct"

@@ -10,30 +10,52 @@ from pydantic import ValidationError
 
 from shopping_agent.contracts import CartSelection, Constraint, SearchInput, ShoppingRequest
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
+from shopping_agent.tools.api import ToolError
 from shopping_agent.verifier import eligible, field_value, verify_claims
 
 # todo: need to integrate with validate_candidate tool
 
 TOOLS = [
     {
+        "name": "list_stores",
+        "description": (
+            "List storefronts. Call this first. On multi-store catalogs every search "
+            "needs a store_id from this list. If the tool returns mode=flat, search "
+            "without store_id."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "search",
-        "description": "Search the catalog. All query words must match, so start with one broad category word: jackets, bags, or footwear. If a search is empty, try the category or an empty query. Search returns current items, including out-of-stock listings.",
+        "description": (
+            "Search one storefront catalog. All query words must match, so start with "
+            "one broad category word: jackets, bags, or footwear. If a search is empty, "
+            "try the category or an empty query. Search returns current items, including "
+            "out-of-stock listings. Pass store_id whenever list_stores returned stores."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
                 "max_results": {"type": "integer"},
+                "store_id": {"type": "string"},
             },
             "required": ["query"],
         },
     },
     {
         "name": "get_listing",
-        "description": "Get current details for one product.",
+        "description": (
+            "Get current details for one product. Prefer listing_id when search returned "
+            "one; otherwise pass product_id with store_id on multi-store catalogs."
+        ),
         "input_schema": {
             "type": "object",
-            "properties": {"product_id": {"type": "string"}},
-            "required": ["product_id"],
+            "properties": {
+                "product_id": {"type": "string"},
+                "store_id": {"type": "string"},
+                "listing_id": {"type": "string"},
+            },
         },
     },
     {
@@ -46,12 +68,18 @@ TOOLS = [
 
 PROMPT = """
 You are a shopping agent.
-Interpret the shopper's words yourself. Search broadly enough to see every relevant
-candidate, including initially out-of-stock items, and refresh listings before deciding.
+Interpret the shopper's words yourself. Call list_stores first. When stores are present,
+search each relevant store_id separately; never call search without store_id in that mode.
+Search broadly enough to see every relevant candidate, including initially out-of-stock
+items, and refresh listings before deciding. Prefer listing_id when choosing among
+overlapping products sold in multiple stores.
 Use observed attributes rather than titles or sponsored placement. If a required size
 is missing, ask for it. Do not guess facts. Return a JSON object as your final text:
 {"status":"completed|no_valid_product|clarification_needed",
- "product_id":"id or empty string", "response":"short explanation or question",
+ "product_id":"id or empty string",
+ "listing_id":"store_id:product_id when known, else empty string",
+ "store_id":"store id when known, else empty string",
+ "response":"short explanation or question",
  "constraints":[{"attribute":"category","operator":"eq","value":"jackets","hard":true}],
  "ranking_rule":"lowest_price|highest_rating|highest_rating_then_reviews|none",
  "claims":[{"field":"price","value":89}]}
@@ -146,12 +174,16 @@ class Agent:
                     if block["name"] == "search":
                         for item in result.items:
                             products[item.product.product_id] = item
+                            if item.listing_id:
+                                products[item.listing_id] = item
                     elif block["name"] == "get_listing":
                         products[result.product.product_id] = result
+                        if result.listing_id:
+                            products[result.listing_id] = result
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block["id"],
-                        "content": result.model_dump_json(),
+                        "content": self._tool_content(result),
                     })
 
             messages.append({"role": "assistant", "content": answer["content"]})
@@ -191,15 +223,47 @@ class Agent:
                 setattr(self, field, (getattr(self, field) or 0) + value)
         return answer
 
+    @staticmethod
+    def _tool_content(result) -> str:
+        if hasattr(result, "model_dump_json"):
+            return result.model_dump_json()
+        if isinstance(result, list):
+            return json.dumps([
+                row.model_dump(mode="json") if hasattr(row, "model_dump") else row
+                for row in result
+            ])
+        return json.dumps(result)
+
     def use_tool(self, name, arguments, tools):
+        arguments = dict(arguments or {})
+        if name == "list_stores":
+            try:
+                stores = tools.list_stores()
+            except ToolError as exc:
+                if exc.status_code != 404:
+                    raise
+                return {"mode": "flat", "stores": []}
+            return {
+                "mode": "multi-store",
+                "stores": [store.model_dump(mode="json") for store in stores],
+            }
         if name == "search":
-            arguments = dict(arguments)
             limit = arguments.get("max_results", 20)
             if isinstance(limit, (int, float)) and not isinstance(limit, bool):
                 arguments["max_results"] = min(50, max(1, int(limit)))
+            store_id = arguments.get("store_id")
+            if isinstance(store_id, str) and not store_id.strip():
+                arguments.pop("store_id", None)
             return tools.search(SearchInput.model_validate(arguments))
         if name == "get_listing":
-            return tools.get_listing(arguments["product_id"])
+            listing_id = arguments.get("listing_id") or None
+            product_id = arguments.get("product_id") or None
+            store_id = arguments.get("store_id") or None
+            if isinstance(listing_id, str) and not listing_id.strip():
+                listing_id = None
+            if isinstance(store_id, str) and not store_id.strip():
+                store_id = None
+            return tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
         if name == "inspect_cart":
             return tools.inspect_cart()
         raise ValueError("Unknown tool: " + str(name))
@@ -292,6 +356,17 @@ class Agent:
         if not isinstance(product_id, str) or not product_id.strip():
             raise ClaudeResponseError(stop_reason, content, "completed decision missing product_id")
 
+        listing_id = decision.get("listing_id") if isinstance(decision.get("listing_id"), str) else ""
+        store_id = decision.get("store_id") if isinstance(decision.get("store_id"), str) else ""
+        listing_id = listing_id.strip() or None
+        store_id = store_id.strip() or None
+        prior = products.get(listing_id) if listing_id else None
+        if prior is None:
+            prior = products.get(product_id)
+        if prior is not None:
+            listing_id = listing_id or prior.listing_id
+            store_id = store_id or prior.store_id
+
         if inputs.ranking_rule is None:
             try:
                 constraints = [Constraint.model_validate(row) for row in decision["constraints"]]
@@ -308,10 +383,14 @@ class Agent:
 
         diagnostics["ranking_rule"] = rule
         diagnostics["raw_constraints"] = [row.model_dump(mode="json") for row in constraints]
+        diagnostics["listing_id"] = listing_id
+        diagnostics["store_id"] = store_id
 
         # Verify Claude's chosen product against a refreshed listing — never re-rank away from it.
-        product = tools.get_listing(product_id)
+        product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
         products[product_id] = product
+        if product.listing_id:
+            products[product.listing_id] = product
         constraints = self.normalize_constraints(constraints, [product])
         diagnostics["interpreted_constraints"] = [row.model_dump(mode="json") for row in constraints]
         diagnostics["eligible_product_ids"] = (
@@ -328,7 +407,12 @@ class Agent:
         cart = tools.inspect_cart()
         if cart.items:
             raise ClaudeResponseError(stop_reason, content, "cart was not empty before purchase")
-        cart = tools.add_to_cart(CartSelection(product_id=product_id, quantity=1))
+        cart = tools.add_to_cart(CartSelection(
+            product_id=product_id,
+            quantity=1,
+            store_id=product.store_id,
+            listing_id=product.listing_id,
+        ))
         if len(cart.items) != 1 or cart.items[0].product_id != product_id:
             raise ClaudeResponseError(stop_reason, content, "cart verification failed")
         if (
@@ -358,6 +442,7 @@ class Agent:
 
         return AgentOutput(
             selected_product_ids=[product_id],
+            selected_listing_ids=[product.listing_id] if product.listing_id else [],
             response_text=response_text,
             claims=claims,
             evidence=verify_claims(product, claims),

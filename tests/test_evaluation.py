@@ -26,11 +26,8 @@ def harness_examples():
 
 
 def observation(product):
-    return ProductObservation(
-        product=product,
-        source_url="http://testserver/listing",
-        observed_at=datetime.now(timezone.utc),
-    )
+    return ProductObservation(product=product, source_url="http://testserver/listing",
+                              observed_at=datetime.now(timezone.utc))
 
 
 def test_verifier_boundary_missing_boolean_and_claims():
@@ -235,6 +232,7 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     env = {**os.environ, "PYTHONPATH": str(root / "src"), "NO_COLOR": "1"}
     command = [
         sys.executable, "-m", "shopping_agent.cli", "run",
+        "--mode", "flat",
         "--repetitions", "1",
         "--tasks", str(root / "data" / "tasks" / "harness"),
         "--output", str(output),
@@ -248,6 +246,7 @@ def test_cli_generates_actual_jsonl_and_report(tmp_path):
     assert "All trials passed." in completed.stdout
     json_command = [
         sys.executable, "-m", "shopping_agent.cli", "run",
+        "--mode", "flat",
         "--repetitions", "1",
         "--tasks", str(root / "data" / "tasks" / "harness"),
         "--output", str(tmp_path / "runs-json.jsonl"),
@@ -275,7 +274,7 @@ def test_final_refresh_reranks_late_price_change(new_price):
     result = run_trial(catalog, task)
     assert result.is_successful
     assert result.selected_product_ids == ["summit-shell"]
-    assert result.tool_calls == 9
+    assert result.tool_calls == 10  # list_stores probe + search + listing reads + cart
     assert result.cart_items[0].product_id == "summit-shell"
 
 
@@ -286,5 +285,5 @@ def test_late_change_can_preserve_the_same_winner():
     result = run_trial(catalog, task)
     assert result.is_successful
     assert result.selected_product_ids == ["ridge-shell"]
-    assert result.tool_calls == 8
+    assert result.tool_calls == 9  # list_stores probe + search + listing reads + cart
     assert result.claims[1]["value"] == 90
