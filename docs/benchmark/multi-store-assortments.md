@@ -187,35 +187,31 @@ When multi-store UI densifies after PR #17, aim ~10–15 chrome blocks beyond ti
 
 ## Design stress findings
 
-### 1. Compat-mode projection pitfalls (overlap SKUs collapsing to one Product)
-- **Price / stock collision:** `Product` requires scalar `price` and `stock`, while `CatalogExample` enforces strict global `product_id` uniqueness. Overlap SKUs (`ridge-shell`, `harbor-backpack`, `tarn-fell`) have divergent prices across stores (e.g. `ridge-shell` at $89, $94, $99).
-- **Evaluation corruption:** Selecting min-price or arbitrary first/last assortment row alters ground-truth budget constraints and lowest-price evaluations compared to `catalog-v2`. Summing stock creates fictitious inventory; picking a single store hides inventory. Synthesizing IDs (e.g. `ridge-shell--summit`) breaks existing tasks expecting canonical `valid_product_ids`.
-- **Compat rule:** Compat-mode projection cannot dynamically reconcile multi-store offers. It must strictly pin a single designated "canonical store" (e.g. `trailworks-direct` matching `catalog-v2` baseline values) and ignore secondary store assortment rows entirely during flat export.
+Stress-tested during exploration; resolutions landed as **stores-v1** on PR #19 (compat export still optional for the default NL suite).
 
-### 2. Cart identity: `product_id` vs `listing_id` for scoring
-- **Scoring blindspot:** `CartSelection` and `ExpectedOutcome.valid_product_ids` currently key solely on `product_id`. If an agent adds `ridge-shell` from `summit-outfitters` ($94) instead of `trailworks-direct` ($89) for a lowest-price prompt, evaluating against `valid_product_ids: ["ridge-shell"]` awards an unearned pass.
-- **Cart collisions:** Keying `Store.cart` by `product_id` collapses multi-store purchases into one line item with ambiguous unit pricing.
-- **Resolution:** Cart items must carry `listing_id` (`{store_id}:{product_id}`). For multi-store tasks, `ExpectedOutcome` must evaluate `valid_listing_ids` (or store-qualified pairs) whenever pricing or availability differs across stores. `CartSelection` should add optional `listing_id` and `store_id` fields while retaining `product_id` for backwards compatibility.
+### 1. Compat-mode projection pitfalls — resolved
+- Overlap SKUs cannot collapse into one scalar `Product` without picking a store; synthetic IDs break `unique_ids` / catalog-v2 tasks.
+- **Shipped:** `project_compat()` pins `canonical_store_id` price/stock/sponsored and ignores secondary assortment rows. `project_multi()` keeps listings.
 
-### 3. Mutation targeting (listing-scoped)
-- **Current contract:** `Mutation` only takes `product_id`, mutating global `Product.price` / `Product.stock` across all observations.
-- **Store isolation failure:** A stockout or price change targeted at `product_id` either uniformly mutates all stores stocking that SKU (destroying store isolation) or only touches a privileged store. Essential scenarios—such as Trailworks stocking out mid-trial to force the agent to find stock at Summit, or Metrowear running a flash sale—cannot be modeled.
-- **Resolution:** `Mutation` requires an optional `listing_id: str | None = None` (or `store_id: str | None = None`). When specified, only the designated store's assortment row mutates. Unset/null defaults to canonical store or all-store broadcast for legacy `catalog-v2` tasks.
+### 2. Cart identity for scoring — resolved
+- Product-only cart/scoring would pass Summit `$94` ridge-shell on a Trailworks `$89` lowest-price task.
+- **Shipped:** Multi-store cart keys by `listing_id`; `CartSelection` / `ExpectedOutcome.valid_listing_ids`; listing-aware `score()` when snapshot has `listings`.
 
-### 4. SearchInput: `store_id` (stores-v1)
-- Optional `SearchInput.store_id` shipped with stores-v1 so `CatalogAPI.search` can hit shared `/api/products?store_id=…`.
-- Multi-store **requires** `store_id` at the API (400 if missing); no federated search. Single-store ignores it.
+### 3. Mutation targeting — resolved
+- Product-scoped mutations would broadcast across every store stocking a SKU.
+- **Shipped:** optional `Mutation.listing_id` / `store_id` via `resolve_mutation_rows()`; unset still product-broadcast for legacy tasks.
 
-### 5. Sibling ingest schema conflict check
-- **No conflict — peer schema already aligned.**
-- Sibling schema `ingest-v1.schema.json` and sample `ingest-v1.sample.json` on `t3-1f10f551` have already incorporated our rejection of `brand_seller -> Product.seller`.
-- The schema explicitly documents `stores[].brand_seller` as *"Storefront chrome / branding only. Do NOT project onto Product.seller — a shared product_id keeps one stable seller (seller_default)."*
-- Sibling schema defines `products[].seller_default` to project into `Product.seller`, ensuring co-listed products (e.g. River Gear on Trailworks) maintain stable identity.
-- Minor differences to normalize: sibling stores schema uses `notes` whereas `stores-partition-v1.json` uses `blurb` (loader should accept both); sibling assortment does not include the bootstrap partition's informational `role` field (safe to ignore).
+### 4. SearchInput store scoping — resolved (stores-v1 path)
+- Federated search would erase storefront discovery.
+- **Shipped:** optional `SearchInput.store_id`; multi-store `/api/products` **requires** it (400 if missing); `list_stores()` tool; single-store ignores `store_id`.
 
-### 6. Concrete minimal next prototype steps
-1. **Catalog loader projection:** Build an offline helper in `shopping_agent/` that parses `stores-partition-v1.json` + products, implementing both canonical-store compat projection (zero drift from `catalog-v2`) and multi-store assortment loading.
-2. **Draft `catalog-v3` contracts:** Define backwards-compatible extensions with optional `listing_id` / `store_id` on `CartSelection` and `Mutation`, and a store-scoped search input contract.
-3. **Listing-aware cart & mutations in mock-store:** Update `Store` state machine in a feature branch to key cart inventory and pending mutations by `listing_id` (`{store_id}:{product_id}`).
-4. **Store-scoped search endpoint:** Add store routing (e.g. `/api/stores/{store_id}/products` or `list_stores()` tool) requiring `store_id` so agents cannot bypass store discovery.
-5. **Pilot multi-store task:** Author a single proof-of-concept task (`task-multistore-cheapest-shell`) requiring lowest-price selection of `ridge-shell` at Trailworks ($89) over Summit ($94), scored by `listing_id`.
+### 5. Sibling ingest schema — no conflict
+- Peer `brand_seller` is chrome-only; `seller_default` → `Product.seller`.
+- **Shipped:** partition loader accepts `notes`/`blurb` and informational `role`.
+
+### 6. Prototype steps — done on stores-v1
+1. ~~Catalog loader projection~~ — `shopping_agent/ingest.py` (`load_ingest`, `load_partition`, `merge_partition_with_catalog`, `project_compat` / `project_multi`)
+2. ~~Contract extensions~~ — listing/store fields on cart, mutation, search, observations (`docs/benchmark/stores-v1-contracts.md`)
+3. ~~Listing-aware cart & mutations~~ — `mock-store/server/multi_store.py` (product-only cart rejected)
+4. ~~Store-scoped search + `list_stores`~~ — `/api/stores`, `/api/stores/{store_id}/products`, shared `/api/products?store_id=`
+5. ~~Pilot tasks~~ — `data/tasks/stores/multistore_cheapest_waterproof_shell.json` (+ tarn-fell price task)
