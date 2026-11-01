@@ -17,6 +17,7 @@ from shopping_agent.agent.rules import RulesAgent
 from shopping_agent.contracts import (
     CartSelection,
     CatalogExample,
+    IngestCatalog,
     ShoppingRequest,
     TaskDefinition,
     TrialResult,
@@ -50,9 +51,10 @@ def load_store_modules():
         sys.path.insert(0, path)
 
     from server.app import create_app
+    from server.multi_store import MultiStore, load_multi_store_examples
     from server.state import Store, load_examples
 
-    return create_app, Store, load_examples
+    return create_app, Store, MultiStore, load_examples, load_multi_store_examples
 
 
 def agent_metadata(agent):
@@ -144,8 +146,18 @@ def failure_record(task, trial_number, reason, duration, trace, error, config) -
     )
 
 
+def _build_store(catalog: CatalogExample | IngestCatalog, task: TaskDefinition):
+    create_app, Store, MultiStore, _, _ = load_store_modules()
+    if isinstance(catalog, IngestCatalog):
+        store = MultiStore(catalog, {task.task_id: task})
+    else:
+        store = Store(catalog, {task.task_id: task})
+    store.reset(task.task_id)
+    return create_app, store
+
+
 def run_trial(
-    catalog: CatalogExample,
+    catalog: CatalogExample | IngestCatalog,
     task: TaskDefinition,
     trial_number: int = 1,
     max_calls: int = 20,
@@ -156,9 +168,7 @@ def run_trial(
     """Worker core; suite's parent process supplies the noncooperative deadline."""
     from starlette.testclient import TestClient
 
-    create_app, Store, _ = load_store_modules()
-    store = Store(catalog, {task.task_id: task})
-    store.reset(task.task_id)
+    create_app, store = _build_store(catalog, task)
     config = metadata(max_calls, seconds)
     selected_agent, agent_name = validate_experiment(task=task, agent=agent)
     config["agent"] = agent_metadata(selected_agent)
@@ -203,11 +213,17 @@ def run_trial(
             trial_number=trial_number,
             mode="api",
             selected_product_ids=output.selected_product_ids,
+            selected_listing_ids=output.selected_listing_ids,
             response_text=output.response_text,
             evidence=output.evidence,
             claims=[claim.model_dump(mode="json") for claim in output.claims],
             cart_items=[
-                CartSelection(product_id=row["product_id"], quantity=row["quantity"])
+                CartSelection(
+                    product_id=row["product_id"],
+                    quantity=row["quantity"],
+                    store_id=row.get("store_id"),
+                    listing_id=row.get("listing_id"),
+                )
                 for row in snapshot["cart"]["items"]
             ],
             constraints_satisfied=satisfied,
@@ -244,7 +260,7 @@ def _worker(send, catalog, task, trial_number, max_calls, seconds, agent):
 
 
 def isolated_trial(
-    catalog: CatalogExample,
+    catalog: CatalogExample | IngestCatalog,
     task: TaskDefinition,
     trial_number: int = 1,
     max_calls: int = 20,
@@ -336,7 +352,7 @@ def isolated_trial(
 
 
 def run_suite(
-    catalog: CatalogExample,
+    catalog: CatalogExample | IngestCatalog,
     tasks: dict[str, TaskDefinition],
     output: Path,
     repetitions: int = 3,

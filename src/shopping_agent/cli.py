@@ -33,11 +33,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Deterministic mock-store evaluation pilot")
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")
-    run.add_argument("--tasks", type=Path, default=ROOT / "data/tasks")
-    run.add_argument("--catalog", type=Path, default=ROOT / "mock-store/server/examples/catalog.json")
+    run.add_argument(
+        "--mode",
+        choices=("multi-store", "flat"),
+        default="multi-store",
+        help="multi-store is the default harder suite; flat keeps the single-catalog NL suite",
+    )
+    run.add_argument("--tasks", type=Path, default=None)
+    run.add_argument("--catalog", type=Path, default=None)
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--repetitions", type=positive_int, default=3)
-    run.add_argument("--seed", type=int, default=498)
+    run.add_argument("--seed", type=int, default=49)
     run.add_argument("--max-calls", type=positive_int, default=20)
     run.add_argument("--timeout", type=positive_seconds, default=60)
     run.add_argument("--agent", choices=("rules", "claude"), default="rules")
@@ -55,8 +61,15 @@ def main(argv=None):
         return 0
 
     if args.command == "run":
-        _, _, load_examples = load_store_modules()
-        catalog, tasks = load_examples(args.catalog, args.tasks)
+        _, _, _, load_examples, load_multi_store_examples = load_store_modules()
+        if args.mode == "multi-store":
+            catalog_path = args.catalog or (ROOT / "mock-store/server/examples/ingest.example.json")
+            tasks_path = args.tasks or (ROOT / "data/tasks/stores")
+            catalog, tasks = load_multi_store_examples(catalog_path, tasks_path)
+        else:
+            catalog_path = args.catalog or (ROOT / "mock-store/server/examples/catalog.json")
+            tasks_path = args.tasks or (ROOT / "data/tasks")
+            catalog, tasks = load_examples(catalog_path, tasks_path)
         records = run_suite(
             catalog, tasks, args.output, args.repetitions, args.seed,
             args.max_calls, args.timeout, args.agent,

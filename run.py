@@ -125,7 +125,7 @@ def main() -> int:
 
         print(f"Shopping store is running at {SHOP_URL}")
         if BIND_HOST not in {"127.0.0.1", "localhost"}:
-            print(f"Listening on {BIND_HOST} (override with HOST=...).")
+            print(f"Listening on {BIND_HOST} (override with HOST=…).")
         print("Press Ctrl+C to stop both servers.")
         webbrowser.open(SHOP_URL)
 
