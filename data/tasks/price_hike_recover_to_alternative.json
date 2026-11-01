@@ -1,7 +1,5 @@
 {
   "task_id": "price_hike_recover_to_alternative",
-  "version": "suite-v4",
-  "catalog_version": "catalog-v2",
   "difficulty": "hard",
   "agent_surface": "nl",
   "request": {

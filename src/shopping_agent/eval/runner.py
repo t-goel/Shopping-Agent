@@ -57,8 +57,11 @@ def load_store_modules():
 
 def agent_metadata(agent):
     selected, name = select_agent(agent)
-    return {"agent_name": name, "model_id": getattr(selected, "model", None),
-            "prompt_version": getattr(selected, "prompt_version", None)}
+    return {
+        "agent_name": name,
+        "model_id": getattr(selected, "model", None),
+        "prompt_id": getattr(selected, "prompt_id", None),
+    }
 
 
 def metadata(max_calls: int, seconds: float) -> dict:
@@ -75,8 +78,8 @@ def metadata(max_calls: int, seconds: float) -> dict:
     return {
         "git_commit": commit,
         "source_sha256": source.hexdigest(),
-        "runner_version": "evaluation-v2",
-        "baseline_version": "rules-v1",
+        "runner": "evaluation",
+        "baseline": "rules",
         "max_tool_calls": max_calls,
         "timeout_seconds": seconds,
         "python": platform.python_version(),
@@ -122,8 +125,6 @@ def validate_experiment(task: TaskDefinition | None = None, tasks: dict[str, Tas
 def failure_record(task, trial_number, reason, duration, trace, error, config) -> TrialResult:
     return TrialResult(
         task_id=task.task_id,
-        task_version=task.version,
-        catalog_version=task.catalog_version,
         **config["agent"],
         trial_number=trial_number,
         mode="api",
@@ -196,8 +197,6 @@ def run_trial(
 
         return TrialResult(
             task_id=task.task_id,
-            task_version=task.version,
-            catalog_version=task.catalog_version,
             **agent_metadata(selected_agent),
             input_tokens=getattr(selected_agent, "input_tokens", None),
             output_tokens=getattr(selected_agent, "output_tokens", None),

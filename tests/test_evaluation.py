@@ -26,8 +26,11 @@ def harness_examples():
 
 
 def observation(product):
-    return ProductObservation(product=product, source_url="http://testserver/listing",
-                              observed_at=datetime.now(timezone.utc), catalog_version="catalog-v2")
+    return ProductObservation(
+        product=product,
+        source_url="http://testserver/listing",
+        observed_at=datetime.now(timezone.utc),
+    )
 
 
 def test_verifier_boundary_missing_boolean_and_claims():

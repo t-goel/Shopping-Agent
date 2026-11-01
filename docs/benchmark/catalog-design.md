@@ -1,14 +1,14 @@
-# Catalog design — `catalog-v2`
+# Catalog design
 
-This document explains how the mock-store catalog used by the benchmark benchmark is designed: the authoring principles, the deliberate decoy types, the attribute schema, and how the catalog supports the planned evaluation axes. It is about the benchmark data, not about any agent implementation; agents are never given this file, and none of the ground truth below is exposed through the store's public surface.
+This document explains how the mock-store catalog used by the benchmark is designed: the authoring principles, the deliberate decoy types, the attribute schema, and how the catalog supports the planned evaluation axes. It is about the benchmark data, not about any agent implementation; agents are never given this file, and none of the ground truth below is exposed through the store's public surface.
 
-## Scope and versioning
+## Scope
 
-- The catalog lives at `mock-store/server/examples/catalog.json` and is versioned by its top-level `version` field (`catalog-v2`).
-- Every task definition in `data/tasks/*.json` declares a `catalog_version` that must match; the authoring loader rejects mismatches.
-- Changes to existing products' ground truth (price, stock, attributes, reviews) require a new catalog version and a re-validation of every task's expected outcome. Adding products, however, is safe for tasks that constrain on `category`, as long as it does not change which existing products win.
+- The catalog lives at `mock-store/server/examples/catalog.json` (no version field — iterate the file in place).
+- The authoring loader validates task expectations against the live catalog contents.
+- Changing product ground truth (price, stock, attributes, reviews) requires re-validating every task's expected outcome. Adding products is usually safe for category-constrained tasks as long as winners do not change.
 
-`catalog-v2` is a pure expansion of `catalog-v1`: the six `catalog-v1` products are retained verbatim (IDs, prices, stock, reviews, order), and fourteen products were added in the new `bags` and `footwear` categories — 20 products across three categories total.
+The current catalog has 20 products across `jackets`, `bags`, and `footwear`.
 
 ### Why the existing jacket tasks keep their expected outcomes
 
@@ -75,7 +75,7 @@ Each type below has at least one concrete instance per category where it applies
 
 ## Authoring rules going forward
 
-- New tasks must pin `catalog_version: "catalog-v2"` until a further catalog revision changes ground truth; at that point re-run `expected_products` recomputation for every task.
+- After catalog ground-truth edits, re-run `expected_products` recomputation for every task.
 - The loader (`load_examples()`) re-derives each non-clarification task's expected valid set from the catalog plus its scheduled mutations and rejects any task whose declared `valid_product_ids` disagree. Expected sets are documented by hand, never copied from agent output.
 - Mutations must target products whose un-mutated state makes the task interesting (a would-be winner going bad, or a near-miss becoming valid).
 - Do not "fix" a decoy by making it secretly satisfy the constraint; its job is to be tempting and wrong.

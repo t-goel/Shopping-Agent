@@ -81,7 +81,7 @@ class ClaudeResponseError(RuntimeError):
 
 class Agent:
     def __init__(self, api_key=None, model=None, effort=None, max_turns=10):
-        self.prompt_version = hashlib.sha256(
+        self.prompt_id = hashlib.sha256(
             (PROMPT + json.dumps(TOOLS, sort_keys=True)).encode()).hexdigest()
         self.input_tokens = None
         self.output_tokens = None

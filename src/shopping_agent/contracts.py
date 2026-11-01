@@ -1,4 +1,4 @@
-"""Versioned example, store, and evaluation contracts shared across the project."""
+"""Example, store, and evaluation contracts shared across the project."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -65,7 +65,6 @@ class Product(Contract):
 
 
 class CatalogExample(Contract):
-    version: str = Field(min_length=1)
     products: list[Product] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -119,8 +118,6 @@ class ExpectedOutcome(Contract):
 
 class TaskDefinition(Contract):
     task_id: str = Field(pattern=r"^[a-z0-9_-]+$")
-    version: str = Field(min_length=1)
-    catalog_version: str = Field(min_length=1)
     difficulty: Literal["easy", "medium", "hard"]
     agent_surface: Literal["structured", "nl"] = "structured"
     request: ShoppingRequest
@@ -158,7 +155,6 @@ class ProductObservation(Contract):
     product: Product
     source_url: str
     observed_at: datetime
-    catalog_version: str
 
 
 class SearchResult(Contract):
@@ -184,11 +180,9 @@ class CartSelection(Contract):
 
 class TrialResult(Contract):
     task_id: str
-    task_version: str
-    catalog_version: str
     agent_name: str
     model_id: str | None
-    prompt_version: str | None
+    prompt_id: str | None = None
     trial_number: int = Field(ge=1)
     mode: Literal["api", "browser"]
     selected_product_ids: list[str]

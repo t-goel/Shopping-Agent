@@ -35,9 +35,7 @@ def test_suite_composition_and_difficulty_mix():
 
     assert set(tasks) == SUITE_IDS
     assert len(tasks) == 10
-    assert all(task.catalog_version == catalog.version == "catalog-v2" for task in tasks.values())
     assert all(task.agent_surface == "nl" for task in tasks.values())
-    assert all(task.version == "suite-v4" for task in tasks.values())
 
     counts = {"easy": 0, "medium": 0, "hard": 0}
     for task in tasks.values():
@@ -88,8 +86,6 @@ def test_task_summary_stays_in_sync_with_task_files():
     summary = json.loads((ROOT / "docs/benchmark/task-summary.json").read_text())
     rows = {row["task_id"]: row for row in summary["tasks"]}
 
-    assert summary["suite_version"] == "suite-v4"
-    assert summary["catalog_version"] == catalog.version
     assert summary["agent_surface"] == "nl"
     assert summary["task_count"] == len(tasks) == 10
     assert summary["difficulty_counts"] == {"easy": 3, "medium": 3, "hard": 4}
