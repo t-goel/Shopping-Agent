@@ -25,20 +25,19 @@ The mock store is synthetic and local-only. It does not make purchases or handle
 From the repository root, install `requirements-dev.txt`, then run:
 
 ```sh
-python eval.py run --tasks data/tasks/harness --output results/rules.jsonl
-python eval.py report results/rules.jsonl
+PYTHONPATH=src python -m shopping_agent.cli run --output results/rules.jsonl
+PYTHONPATH=src python -m shopping_agent.cli report results/rules.jsonl
 python -m pytest -q
 ```
 
 PowerShell equivalent:
 
 ```powershell
-py eval.py run --tasks data/tasks/harness --output results/rules.jsonl
-py eval.py report results/rules.jsonl
+$env:PYTHONPATH = "src"
+py -m shopping_agent.cli run --output results/rules.jsonl
+py -m shopping_agent.cli report results/rules.jsonl
 py -m pytest -q
 ```
-
-`eval.py` bootstraps `src/` for a checkout. After `py -m pip install -e .`, you can also use `shopping-agent` or `py -m shopping_agent`.
 
 Defaults: three repetitions, seeded shuffled task order (`498`), twenty public tool calls,
 60 seconds per worker trial. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
@@ -71,20 +70,3 @@ and [reviewed pilot records](docs/pilot/rules-2026-10-12-reviewed.jsonl).
 A visually checked [Update 2 PDF draft](output/pdf/project-update-2-draft.pdf) is included.
 It remains a draft until the team supplies all four names and actual contribution statements.
 The original pilot records are retained alongside the rerun after the reviewer fixes.
-
-## Update 3 evaluation
-
-The default `data/tasks` directory now contains natural-language tasks; the rules agent
-requires `--tasks data/tasks/harness`. The runner rejects incompatible input conditions
-and missing Claude credentials before writing trial records. Use `--agent claude` for
-the NL suite with `ANTHROPIC_API_KEY` configured in the environment. The Claude agent
-defaults to `claude-haiku-5-5` at `high` effort (`ANTHROPIC_MODEL` /
-`ANTHROPIC_EFFORT` override).
-
-Reports include per-task outcomes and observable failure categories. Add `--markdown`
-to `report` for a table suitable for the project update. Reports reject mixed agent,
-model, prompt, or input-surface conditions. Model tokens are summed only when all trials
-have complete provider measurements; dollar cost remains unavailable unless supplied.
-
-See [implementation and writing plan](docs/project-update-3-plan.md) and
-[Billy's verified update text](docs/project-update-3-billy.md).

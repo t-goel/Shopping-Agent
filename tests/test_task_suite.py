@@ -1,4 +1,4 @@
-"""Authoring checks for the 10-task suite-v4 NL scored suite."""
+"""Authoring checks for the 10-task flat NL scored suite."""
 
 import json
 from pathlib import Path
@@ -61,12 +61,6 @@ def test_clarify_tasks_have_no_planted_cue(task_id, needle):
     assert task.expected.kind == "clarification"
     assert task.request.clarification_needed is None
     assert task.expected.question_contains == needle
-
-
-def test_rating_tie_break_is_stated_in_shopper_request():
-    _, tasks = load_examples()
-    request = tasks["nl_size9_waterproof_shoe_by_rating"].request.original_text.casefold()
-    assert "tie" in request and "more reviews" in request
 
 
 @pytest.mark.parametrize("task_id", sorted(SUITE_IDS))

@@ -1,0 +1,43 @@
+{
+  "task_id": "multistore_cheapest_harbor_backpack",
+  "difficulty": "medium",
+  "agent_surface": "structured",
+  "notes": "harbor-backpack is cheaper at Trailworks ($64) than Metrowear ($69). Must pick listing_id, not just product_id.",
+  "request": {
+    "original_text": "Find the cheapest waterproof daypack under $80. Prices differ by store.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "bags",
+        "hard": true
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true,
+        "hard": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 80,
+        "hard": true
+      }
+    ],
+    "preferences": [],
+    "clarification_needed": null
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "harbor-backpack"
+    ],
+    "valid_listing_ids": [
+      "trailworks-direct:harbor-backpack"
+    ],
+    "question_contains": null
+  },
+  "mutations": []
+}
