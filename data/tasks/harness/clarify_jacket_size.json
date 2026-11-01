@@ -1,7 +1,7 @@
 {
   "task_id": "clarify_jacket_size",
-  "version": "example-v1",
-  "catalog_version": "catalog-v2",
+  "version": "1",
+  "catalog_version": "catalog",
   "difficulty": "medium",
   "agent_surface": "structured",
   "request": {

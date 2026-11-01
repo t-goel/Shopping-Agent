@@ -1,4 +1,4 @@
-"""Multi-store catalog and cart state for stores-v1 benchmark trials."""
+"""Multi-store catalog and cart state for benchmark trials."""
 
 from __future__ import annotations
 
@@ -20,14 +20,14 @@ from shopping_agent.ingest import load_ingest
 from server.state import Cart, CartItem, StoreError, product_matches_query
 
 ROOT = Path(__file__).resolve().parents[2]
-INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.example.json"
+INGEST_PATH = ROOT / "mock-store/server/examples/ingest.example.json"
 STORES_TASKS_PATH = ROOT / "data/tasks/stores"
 
 
 def load_multi_store_examples(
     ingest_path: Path = INGEST_PATH, tasks_path: Path = STORES_TASKS_PATH
 ) -> tuple[IngestCatalog, dict[str, TaskDefinition]]:
-    """Load ingest-v1 catalog and multi-store task definitions."""
+    """Load multi-store ingest catalog and task definitions."""
     ingest = load_ingest(ingest_path)
     tasks: dict[str, TaskDefinition] = {}
 
@@ -81,7 +81,7 @@ class MultiStore:
             self.ingest = IngestCatalog.model_validate(ingest)
 
         self.tasks = tasks or {}
-        self.catalog_version = "stores-v1"
+        self.catalog_version = "multi-store"
         self.stores: dict[str, StoreRecord] = {s.store_id: s for s in self.ingest.stores}
         self.products: dict[str, IngestProduct] = {
             p.product_id: p for p in self.ingest.products

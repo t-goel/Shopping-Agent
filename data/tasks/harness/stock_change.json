@@ -1,7 +1,7 @@
 {
   "task_id": "stock_change",
-  "version": "example-v1",
-  "catalog_version": "catalog-v2",
+  "version": "1",
+  "catalog_version": "catalog",
   "difficulty": "hard",
   "agent_surface": "structured",
   "request": {

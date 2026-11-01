@@ -310,7 +310,7 @@ def resolve_mutation_rows(
 class StoresPartition(Contract):
     """Assortment overlay for an existing catalog (no inline products)."""
 
-    ingest_version: Literal["ingest-v1"] | None = "ingest-v1"
+    ingest_version: str | None = "ingest"
     catalog_bootstrap: str | None = None
     notes: str | None = None
     stores: list[StoreRecord] = Field(min_length=1)
@@ -319,7 +319,7 @@ class StoresPartition(Contract):
 
 
 class IngestCatalog(Contract):
-    ingest_version: Literal["ingest-v1"] = "ingest-v1"
+    ingest_version: str = "ingest"
     notes: str | None = None
     catalog_bootstrap: str | None = None
     stores: list[StoreRecord] = Field(min_length=1)

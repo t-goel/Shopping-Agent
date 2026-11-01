@@ -1,7 +1,7 @@
 {
   "task_id": "multistore_cheapest_size9_waterproof_hiker",
-  "version": "stores-v1-draft",
-  "catalog_version": "stores-v1",
+  "version": "1",
+  "catalog_version": "multi-store",
   "difficulty": "medium",
   "agent_surface": "structured",
   "notes": "Winner is headwater-supply:tarn-fell ($88), not trailworks-direct:tarn-fell ($91). seller stays River Gear on both; store_id is the differentiator.",
@@ -33,8 +33,12 @@
   "ranking_rule": "lowest_price",
   "expected": {
     "kind": "product",
-    "valid_product_ids": ["tarn-fell"],
-    "valid_listing_ids": ["headwater-supply:tarn-fell"],
+    "valid_product_ids": [
+      "tarn-fell"
+    ],
+    "valid_listing_ids": [
+      "headwater-supply:tarn-fell"
+    ],
     "question_contains": null
   },
   "mutations": []

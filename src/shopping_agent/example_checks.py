@@ -77,7 +77,7 @@ def _listing_as_product(ingest: IngestCatalog, row: AssortmentRow) -> Product:
 
 
 def expected_listings(ingest: IngestCatalog, task: TaskDefinition) -> set[str]:
-    """Compute winning listing_ids for a stores-v1 task after scheduled mutations."""
+    """Compute winning listing_ids for a multi-store task after scheduled mutations."""
     listings = {
         row.listing_id: row.model_copy(deep=True) for row in ingest.assortment
     }

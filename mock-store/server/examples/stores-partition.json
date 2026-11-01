@@ -1,7 +1,7 @@
 {
-  "ingest_version": "ingest-v1",
-  "catalog_bootstrap": "catalog-v2",
-  "notes": "Bootstrap partition: projects today's catalog-v2 SKUs into 5 stores. Overlap SKUs share product_id; only price/stock/sponsored differ. Decoys and specialty uniques are single-store.",
+  "ingest_version": "ingest",
+  "catalog_bootstrap": "catalog",
+  "notes": "Bootstrap partition: projects today's catalog SKUs into 5 stores. Overlap SKUs share product_id; only price/stock/sponsored differ. Decoys and specialty uniques are single-store.",
   "stores": [
     {
       "store_id": "trailworks-direct",
@@ -36,7 +36,10 @@
   ],
   "overlap_rules": {
     "identity": "product_id is global; attributes/reviews/seller never store-local",
-    "assortment_key": ["store_id", "product_id"],
+    "assortment_key": [
+      "store_id",
+      "product_id"
+    ],
     "listing_id_format": "{store_id}:{product_id}",
     "overlap_means": "same product_id in >=2 assortment rows",
     "unique_means": "exactly one assortment row",

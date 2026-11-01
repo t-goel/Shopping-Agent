@@ -1,4 +1,4 @@
-"""Tests for stores-v1 multi-store runtime, ingest projection, and contracts."""
+"""Tests for multi-store multi-store runtime, ingest projection, and contracts."""
 
 from pathlib import Path
 import pytest
@@ -27,7 +27,7 @@ from shopping_agent.interfaces import AgentOutput
 from shopping_agent.contracts import CatalogExample
 
 ROOT = Path(__file__).resolve().parents[1]
-INGEST_PATH = ROOT / "mock-store/server/examples/ingest-v1.example.json"
+INGEST_PATH = ROOT / "mock-store/server/examples/ingest.example.json"
 
 
 def test_ingest_load_and_canonical_compat_prices():
@@ -37,7 +37,7 @@ def test_ingest_load_and_canonical_compat_prices():
     assert len(ingest.assortment) == 10
 
     compat = project_compat(ingest)
-    assert compat["version"] == "catalog-v2+ingest-compat"
+    assert compat["version"] == "catalog+ingest-compat"
     assert len(compat["products"]) == 6
     assert compat["meta"]["overlap_product_ids"] == [
         "harbor-backpack",
@@ -62,7 +62,7 @@ def test_ingest_load_and_canonical_compat_prices():
     assert by_id["tarn-fell"]["seller"] == "River Gear"
 
     multi = project_multi(ingest)
-    assert multi["version"] == "stores-v1"
+    assert multi["version"] == "multi-store"
     assert multi["meta"]["listing_count"] == 10
     assert len(multi["listings"]) == 10
 
@@ -236,27 +236,40 @@ def test_scoring_expected_outcome_valid_listing_ids():
 
 def test_multi_store_tasks_load():
     ingest, tasks = load_multi_store_examples()
+    assert len(tasks) >= 4
     assert "multistore_cheapest_waterproof_shell" in tasks
     assert "multistore_cheapest_size9_waterproof_hiker" in tasks
+    assert "multistore_cheapest_harbor_backpack" in tasks
+    assert "multistore_avoid_clearance_reseller_shell" in tasks
 
     shell_task = tasks["multistore_cheapest_waterproof_shell"]
-    assert shell_task.catalog_version == "stores-v1"
+    assert shell_task.catalog_version == "multi-store"
     assert shell_task.expected.valid_listing_ids == ["trailworks-direct:ridge-shell"]
 
     hiker_task = tasks["multistore_cheapest_size9_waterproof_hiker"]
-    assert hiker_task.catalog_version == "stores-v1"
+    assert hiker_task.catalog_version == "multi-store"
     assert hiker_task.expected.valid_listing_ids == ["headwater-supply:tarn-fell"]
 
 
+def test_rules_agent_passes_cheapest_shell_on_multi_store_runner():
+    from shopping_agent.eval.runner import run_trial
+
+    ingest, tasks = load_multi_store_examples()
+    task = tasks["multistore_cheapest_waterproof_shell"]
+    result = run_trial(ingest, task, trial_number=1, max_calls=40, seconds=30)
+    assert result.is_successful, (result.termination_reason, result.error, result.response_text)
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+
+
 def test_partition_loader_accepts_blurb_and_role():
-    partition = load_partition(ROOT / "mock-store/server/examples/stores-partition-v1.json")
+    partition = load_partition(ROOT / "mock-store/server/examples/stores-partition.json")
     assert partition.stores[0].notes  # blurb aliased to notes
     assert any(row.role == "overlap" for row in partition.assortment)
     catalog = CatalogExample.model_validate_json(
         (ROOT / "mock-store/server/examples/catalog.json").read_text(encoding="utf-8")
     )
     merged = merge_partition_with_catalog(partition, catalog)
-    assert merged.catalog_bootstrap == "catalog-v2"
+    assert merged.catalog_bootstrap == "catalog"
     assert len(merged.assortment) == len(partition.assortment)
 
 
@@ -363,8 +376,8 @@ def test_listing_scoped_mutation_isolation():
     ingest = load_ingest(INGEST_PATH)
     task = TaskDefinition(
         task_id="test_listing_mutation",
-        version="stores-v1",
-        catalog_version="stores-v1",
+        version="multi-store",
+        catalog_version="multi-store",
         difficulty="easy",
         request=ShoppingRequest(original_text="test request"),
         ranking_rule="lowest_price",

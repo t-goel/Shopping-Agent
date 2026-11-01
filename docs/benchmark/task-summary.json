@@ -1,6 +1,6 @@
 {
-  "suite_version": "suite-v4",
-  "catalog_version": "catalog-v2",
+  "suite_version": "1",
+  "catalog_version": "catalog",
   "agent_surface": "nl",
   "task_count": 10,
   "difficulty_counts": {"easy": 3, "medium": 3, "hard": 4},

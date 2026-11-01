@@ -1,5 +1,5 @@
 {
-  "ingest_version": "ingest-v1",
+  "ingest_version": "ingest",
   "notes": "Aligned with multi-store partition confirmation. brand_seller is storefront chrome only; Product.seller comes from seller_default. Includes bootstrap extras: clearance genuine ridge-shell ($99) and tarn-fell overlap (trailworks $91 / headwater $88). Peer projector uses cheapest in-stock for flat compat.",
   "stores": [
     {
@@ -42,7 +42,11 @@
       "currency": "USD",
       "canonical_store_id": "trailworks-direct",
       "seller_default": "Trailworks",
-      "attributes": { "waterproof": true, "size": "M", "color": "navy" },
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      },
       "reviews": [
         {
           "review_id": "ing-r1",
@@ -56,7 +60,7 @@
         "retailer_hint": null,
         "source_url": null,
         "captured_at": null,
-        "notes": "Carried from catalog-v2 ground truth; not scraped."
+        "notes": "Carried from catalog ground truth; not scraped."
       }
     },
     {
@@ -67,7 +71,11 @@
       "currency": "USD",
       "canonical_store_id": "clearance-corner",
       "seller_default": "Clearance Corner",
-      "attributes": { "waterproof": false, "size": "M", "color": "navy" },
+      "attributes": {
+        "waterproof": false,
+        "size": "M",
+        "color": "navy"
+      },
       "reviews": [
         {
           "review_id": "ing-r2",
@@ -179,7 +187,11 @@
       "currency": "USD",
       "canonical_store_id": "trailworks-direct",
       "seller_default": "River Gear",
-      "attributes": { "waterproof": true, "size": "9", "color": "slate" },
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "slate"
+      },
       "reviews": [
         {
           "review_id": "ing-r6",

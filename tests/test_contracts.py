@@ -19,7 +19,7 @@ def test_examples_load_and_reference_a_known_catalog():
     assert len(tasks) == 10
     assert all(task.catalog_version == catalog.version for task in tasks.values())
     assert all(task.agent_surface == "nl" for task in tasks.values())
-    assert all(task.version == "suite-v4" for task in tasks.values())
+    assert all(task.version == "1" for task in tasks.values())
     assert sum(task.difficulty == "easy" for task in tasks.values()) == 3
     assert sum(task.difficulty == "medium" for task in tasks.values()) == 3
     assert sum(task.difficulty == "hard" for task in tasks.values()) == 4
@@ -35,7 +35,7 @@ def test_harness_surface_a_still_loads():
         "stock_change",
     }
     assert all(task.agent_surface == "structured" for task in tasks.values())
-    assert catalog.version == "catalog-v2"
+    assert catalog.version == "catalog"
 
 
 def test_catalog_rejects_duplicate_ids():

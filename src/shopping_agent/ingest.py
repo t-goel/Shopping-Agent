@@ -1,4 +1,4 @@
-"""Load, validate, and project ingest-v1 catalogs for single-store compat and multi-store."""
+"""Load, validate, and project ingest catalogs for single-store compat and multi-store."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from shopping_agent.contracts import (
 
 
 def load_ingest(source: Path | str | dict) -> IngestCatalog:
-    """Load and validate an ingest-v1 payload from a file path, JSON string, or dict."""
+    """Load and validate an ingest payload from a file path, JSON string, or dict."""
     if isinstance(source, (str, Path)):
         path = Path(source)
         if path.is_file():
@@ -53,7 +53,7 @@ def merge_partition_with_catalog(
     partition: StoresPartition | dict | Path | str,
     catalog: CatalogExample | dict | Path | str,
 ) -> IngestCatalog:
-    """Combine catalog-v2 products with a stores partition into a full ingest-v1 catalog."""
+    """Combine catalog products with a stores partition into a full ingest catalog."""
     if not isinstance(partition, StoresPartition):
         partition = load_partition(partition)
     if isinstance(catalog, (str, Path)):
@@ -93,7 +93,7 @@ def merge_partition_with_catalog(
         if product.product_id in first_store
     ]
     return IngestCatalog(
-        ingest_version="ingest-v1",
+        ingest_version="ingest",
         notes=partition.notes,
         catalog_bootstrap=partition.catalog_bootstrap or catalog.version,
         stores=partition.stores,
@@ -110,7 +110,7 @@ def _to_raw_dict(ingest: dict | IngestCatalog) -> dict:
 
 
 def _choose_compat_listing(src: dict, rows: list[dict]) -> dict:
-    """Price/stock from required canonical_store_id row (catalog-v2-stable)."""
+    """Price/stock from required canonical_store_id row (flat-export stable)."""
     canonical = src.get("canonical_store_id")
     if not canonical:
         raise ValueError(f"{src['product_id']}: canonical_store_id is required")
@@ -157,7 +157,7 @@ def project_compat(ingest: dict | IngestCatalog) -> dict:
         )
 
     return {
-        "version": "catalog-v2+ingest-compat",
+        "version": "catalog+ingest-compat",
         "products": products,
         "meta": {
             "ingest_version": raw["ingest_version"],
@@ -166,7 +166,7 @@ def project_compat(ingest: dict | IngestCatalog) -> dict:
                 pid for pid, rows in listings.items() if len(rows) > 1
             ),
             "compat_rule": "canonical_store_id listing supplies price/stock/sponsored",
-            "warning": "Compat ignores non-canonical overlap offers; multi-mode keeps listing_id.",
+            "warning": "Compat ignores non-canonical overlap offers; multi-store keeps listing_id.",
         },
     }
 
@@ -210,7 +210,7 @@ def project_multi(ingest: dict | IngestCatalog) -> dict:
             }
         )
     return {
-        "version": "stores-v1",
+        "version": "multi-store",
         "stores": raw["stores"],
         "products": products,
         "listings": listings,

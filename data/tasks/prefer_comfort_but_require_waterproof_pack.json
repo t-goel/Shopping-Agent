@@ -1,7 +1,7 @@
 {
   "task_id": "prefer_comfort_but_require_waterproof_pack",
-  "version": "suite-v4",
-  "catalog_version": "catalog-v2",
+  "version": "1",
+  "catalog_version": "catalog",
   "difficulty": "medium",
   "agent_surface": "nl",
   "request": {

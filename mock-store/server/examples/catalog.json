@@ -1,18 +1,30 @@
 {
-  "version": "catalog-v2",
+  "version": "catalog",
   "products": [
     {
       "product_id": "ridge-shell",
       "title": "Ridge Rain Shell",
       "description": "Lightweight waterproof rain jacket with taped seams.",
       "category": "jackets",
-      "price": 89.00,
+      "price": 89.0,
       "stock": 4,
       "seller": "Trailworks",
-      "attributes": {"waterproof": true, "size": "M", "color": "navy"},
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "navy"
+      },
       "reviews": [
-        {"review_id": "r1", "rating": 5, "text": "Stayed dry on a long walk."},
-        {"review_id": "r2", "rating": 4, "text": "Good fit but thin lining."}
+        {
+          "review_id": "r1",
+          "rating": 5,
+          "text": "Stayed dry on a long walk."
+        },
+        {
+          "review_id": "r2",
+          "rating": 4,
+          "text": "Good fit but thin lining."
+        }
       ]
     },
     {
@@ -20,22 +32,42 @@
       "title": "Summit Rain Shell",
       "description": "Waterproof outer layer with sealed zippers.",
       "category": "jackets",
-      "price": 119.00,
+      "price": 119.0,
       "stock": 3,
       "seller": "Summit Outfitters",
-      "attributes": {"waterproof": true, "size": "M", "color": "black"},
-      "reviews": [{"review_id": "r3", "rating": 5, "text": "Durable."}]
+      "attributes": {
+        "waterproof": true,
+        "size": "M",
+        "color": "black"
+      },
+      "reviews": [
+        {
+          "review_id": "r3",
+          "rating": 5,
+          "text": "Durable."
+        }
+      ]
     },
     {
       "product_id": "city-windbreaker",
       "title": "City Windbreaker",
       "description": "Water-resistant casual jacket, not waterproof.",
       "category": "jackets",
-      "price": 49.00,
+      "price": 49.0,
       "stock": 8,
       "seller": "Metrowear",
-      "attributes": {"waterproof": false, "size": "M", "color": "olive"},
-      "reviews": [{"review_id": "r4", "rating": 5, "text": "Comfortable."}],
+      "attributes": {
+        "waterproof": false,
+        "size": "M",
+        "color": "olive"
+      },
+      "reviews": [
+        {
+          "review_id": "r4",
+          "rating": 5,
+          "text": "Comfortable."
+        }
+      ],
       "sponsored": true
     },
     {
@@ -43,21 +75,34 @@
       "title": "River Rain Shell",
       "description": "Waterproof rain jacket with taped seams.",
       "category": "jackets",
-      "price": 79.00,
+      "price": 79.0,
       "stock": 1,
       "seller": "River Gear",
-      "attributes": {"waterproof": true, "size": "S", "color": "green"},
-      "reviews": [{"review_id": "r5", "rating": 3, "text": "Sizes run small."}]
+      "attributes": {
+        "waterproof": true,
+        "size": "S",
+        "color": "green"
+      },
+      "reviews": [
+        {
+          "review_id": "r5",
+          "rating": 3,
+          "text": "Sizes run small."
+        }
+      ]
     },
     {
       "product_id": "ridge-pack",
       "title": "Ridge Daypack",
       "description": "Everyday backpack with padded straps.",
       "category": "bags",
-      "price": 39.00,
+      "price": 39.0,
       "stock": 5,
       "seller": "Trailworks",
-      "attributes": {"capacity_liters": 18, "waterproof": false},
+      "attributes": {
+        "capacity_liters": 18,
+        "waterproof": false
+      },
       "reviews": []
     },
     {
@@ -65,24 +110,46 @@
       "title": "Ridge Rain Shell Waterproof Jacket Deal Waterproof",
       "description": "A similar-looking water-resistant jacket; specifications do not claim waterproofing.",
       "category": "jackets",
-      "price": 69.00,
+      "price": 69.0,
       "stock": 6,
       "seller": "Clearance Corner",
-      "attributes": {"waterproof": false, "size": "M", "color": "navy"},
-      "reviews": [{"review_id": "r6", "rating": 2, "text": "Not the same as the original shell."}]
+      "attributes": {
+        "waterproof": false,
+        "size": "M",
+        "color": "navy"
+      },
+      "reviews": [
+        {
+          "review_id": "r6",
+          "rating": 2,
+          "text": "Not the same as the original shell."
+        }
+      ]
     },
     {
       "product_id": "harbor-backpack",
       "title": "Harbor Dry Pack 22L",
       "description": "Fully waterproof roll-top daypack with welded seams.",
       "category": "bags",
-      "price": 64.00,
+      "price": 64.0,
       "stock": 4,
       "seller": "Trailworks",
-      "attributes": {"waterproof": true, "capacity_liters": 22, "color": "blue"},
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 22,
+        "color": "blue"
+      },
       "reviews": [
-        {"review_id": "r19", "rating": 5, "text": "Nothing got damp inside after hours of rain."},
-        {"review_id": "r20", "rating": 4, "text": "Roll-top is fussy until you learn the fold."}
+        {
+          "review_id": "r19",
+          "rating": 5,
+          "text": "Nothing got damp inside after hours of rain."
+        },
+        {
+          "review_id": "r20",
+          "rating": 4,
+          "text": "Roll-top is fussy until you learn the fold."
+        }
       ]
     },
     {
@@ -90,14 +157,30 @@
       "title": "Canyon Day Pack 30L",
       "description": "Ventilated hiking pack with a rain cover included.",
       "category": "bags",
-      "price": 58.00,
+      "price": 58.0,
       "stock": 7,
       "seller": "Metrowear",
-      "attributes": {"waterproof": false, "capacity_liters": 30, "color": "rust"},
+      "attributes": {
+        "waterproof": false,
+        "capacity_liters": 30,
+        "color": "rust"
+      },
       "reviews": [
-        {"review_id": "r21", "rating": 5, "text": "Most comfortable pack I have carried."},
-        {"review_id": "r22", "rating": 5, "text": "Rain cover handled a light shower."},
-        {"review_id": "r23", "rating": 4, "text": "Cover alone leaked in a real downpour."}
+        {
+          "review_id": "r21",
+          "rating": 5,
+          "text": "Most comfortable pack I have carried."
+        },
+        {
+          "review_id": "r22",
+          "rating": 5,
+          "text": "Rain cover handled a light shower."
+        },
+        {
+          "review_id": "r23",
+          "rating": 4,
+          "text": "Cover alone leaked in a real downpour."
+        }
       ]
     },
     {
@@ -105,33 +188,63 @@
       "title": "Basalt Carryall Duffel 30L",
       "description": "Waterproof welded-seam duffel for wet travel.",
       "category": "bags",
-      "price": 96.00,
+      "price": 96.0,
       "stock": 2,
       "seller": "Summit Outfitters",
-      "attributes": {"waterproof": true, "capacity_liters": 30, "color": "gray"},
-      "reviews": [{"review_id": "r24", "rating": 4, "text": "Genuinely waterproof; stiff to fold."}]
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 30,
+        "color": "gray"
+      },
+      "reviews": [
+        {
+          "review_id": "r24",
+          "rating": 4,
+          "text": "Genuinely waterproof; stiff to fold."
+        }
+      ]
     },
     {
       "product_id": "headwater-duffel",
       "title": "Headwater Expedition Duffel 55L",
       "description": "Heavy-duty waterproof duffel for whitewater trips.",
       "category": "bags",
-      "price": 149.00,
+      "price": 149.0,
       "stock": 3,
       "seller": "Headwater Supply",
-      "attributes": {"waterproof": true, "capacity_liters": 55, "color": "yellow"},
-      "reviews": [{"review_id": "r25", "rating": 5, "text": "Worth it on a monsoon trip."}]
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 55,
+        "color": "yellow"
+      },
+      "reviews": [
+        {
+          "review_id": "r25",
+          "rating": 5,
+          "text": "Worth it on a monsoon trip."
+        }
+      ]
     },
     {
       "product_id": "meadow-sling",
       "title": "Meadow Sling Pack Waterproof Everyday Bag Deal",
       "description": "Water-resistant sling; splash protection only, not a waterproof bag.",
       "category": "bags",
-      "price": 29.00,
+      "price": 29.0,
       "stock": 12,
       "seller": "Metrowear",
-      "attributes": {"waterproof": false, "capacity_liters": 8, "color": "olive"},
-      "reviews": [{"review_id": "r26", "rating": 2, "text": "Zip leaked; fabric not sealed."}],
+      "attributes": {
+        "waterproof": false,
+        "capacity_liters": 8,
+        "color": "olive"
+      },
+      "reviews": [
+        {
+          "review_id": "r26",
+          "rating": 2,
+          "text": "Zip leaked; fabric not sealed."
+        }
+      ],
       "sponsored": true
     },
     {
@@ -139,21 +252,35 @@
       "title": "Ridge Daypack Everyday Backpack Outdoor Pack Deal",
       "description": "Clearance listing that copies a popular daypack's wording; no waterproofing claim.",
       "category": "bags",
-      "price": 42.00,
+      "price": 42.0,
       "stock": 6,
       "seller": "Clearance Corner",
-      "attributes": {"waterproof": false, "capacity_liters": 18, "color": "navy"},
-      "reviews": [{"review_id": "r27", "rating": 2, "text": "Different stitching than the original."}]
+      "attributes": {
+        "waterproof": false,
+        "capacity_liters": 18,
+        "color": "navy"
+      },
+      "reviews": [
+        {
+          "review_id": "r27",
+          "rating": 2,
+          "text": "Different stitching than the original."
+        }
+      ]
     },
     {
       "product_id": "umbra-messenger",
       "title": "Umbra Messenger 15L",
       "description": "Waterproof flap messenger bag with a welded liner.",
       "category": "bags",
-      "price": 71.00,
+      "price": 71.0,
       "stock": 6,
       "seller": "Umbra Goods",
-      "attributes": {"waterproof": true, "capacity_liters": 15, "color": "black"},
+      "attributes": {
+        "waterproof": true,
+        "capacity_liters": 15,
+        "color": "black"
+      },
       "reviews": []
     },
     {
@@ -161,13 +288,25 @@
       "title": "Granite Hiker Mid Waterproof",
       "description": "Waterproof mid-cut hiking boot with a gusseted tongue.",
       "category": "footwear",
-      "price": 127.00,
+      "price": 127.0,
       "stock": 4,
       "seller": "Trailworks",
-      "attributes": {"waterproof": true, "size": "9", "color": "brown"},
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "brown"
+      },
       "reviews": [
-        {"review_id": "r7", "rating": 5, "text": "Kept my feet dry through a soggy canyon day."},
-        {"review_id": "r8", "rating": 4, "text": "Two hard days to break in."}
+        {
+          "review_id": "r7",
+          "rating": 5,
+          "text": "Kept my feet dry through a soggy canyon day."
+        },
+        {
+          "review_id": "r8",
+          "rating": 4,
+          "text": "Two hard days to break in."
+        }
       ]
     },
     {
@@ -175,15 +314,35 @@
       "title": "Tarn Fell Low Hiker",
       "description": "Waterproof low-cut hiker with a rock plate underfoot.",
       "category": "footwear",
-      "price": 91.00,
+      "price": 91.0,
       "stock": 6,
       "seller": "River Gear",
-      "attributes": {"waterproof": true, "size": "9", "color": "slate"},
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "slate"
+      },
       "reviews": [
-        {"review_id": "r9", "rating": 4, "text": "Dry feet over wet roots."},
-        {"review_id": "r10", "rating": 4, "text": "Stable and light."},
-        {"review_id": "r11", "rating": 5, "text": "Held up on a week of trail."},
-        {"review_id": "r12", "rating": 5, "text": "No blisters straight from the box."}
+        {
+          "review_id": "r9",
+          "rating": 4,
+          "text": "Dry feet over wet roots."
+        },
+        {
+          "review_id": "r10",
+          "rating": 4,
+          "text": "Stable and light."
+        },
+        {
+          "review_id": "r11",
+          "rating": 5,
+          "text": "Held up on a week of trail."
+        },
+        {
+          "review_id": "r12",
+          "rating": 5,
+          "text": "No blisters straight from the box."
+        }
       ]
     },
     {
@@ -191,13 +350,25 @@
       "title": "Swale Trail Runner",
       "description": "Waterproof trail runner for mixed terrain.",
       "category": "footwear",
-      "price": 81.00,
+      "price": 81.0,
       "stock": 3,
       "seller": "Summit Outfitters",
-      "attributes": {"waterproof": true, "size": "10.5", "color": "yellow"},
+      "attributes": {
+        "waterproof": true,
+        "size": "10.5",
+        "color": "yellow"
+      },
       "reviews": [
-        {"review_id": "r13", "rating": 5, "text": "Grippy and quick to dry."},
-        {"review_id": "r14", "rating": 1, "text": "Seam failed after three hikes."}
+        {
+          "review_id": "r13",
+          "rating": 5,
+          "text": "Grippy and quick to dry."
+        },
+        {
+          "review_id": "r14",
+          "rating": 1,
+          "text": "Seam failed after three hikes."
+        }
       ]
     },
     {
@@ -205,11 +376,21 @@
       "title": "Peak Quest Ultra Waterproof Hiking Trail Running Shoe Deal",
       "description": "Water-repellent mesh trail shoe. Not a waterproof membrane; drizzle only.",
       "category": "footwear",
-      "price": 74.00,
+      "price": 74.0,
       "stock": 10,
       "seller": "Metrowear",
-      "attributes": {"waterproof": false, "size": "10", "color": "charcoal"},
-      "reviews": [{"review_id": "r15", "rating": 4, "text": "Light and comfy in the drizzle."}],
+      "attributes": {
+        "waterproof": false,
+        "size": "10",
+        "color": "charcoal"
+      },
+      "reviews": [
+        {
+          "review_id": "r15",
+          "rating": 4,
+          "text": "Light and comfy in the drizzle."
+        }
+      ],
       "sponsored": true
     },
     {
@@ -217,32 +398,56 @@
       "title": "Cinder Hiker Waterproof",
       "description": "Waterproof low hiker with a recycled upper.",
       "category": "footwear",
-      "price": 69.00,
+      "price": 69.0,
       "stock": 0,
       "seller": "Umbra Goods",
-      "attributes": {"waterproof": true, "size": "9", "color": "black"},
-      "reviews": [{"review_id": "r17", "rating": 5, "text": "Best waterproof shoe I have owned."}]
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "black"
+      },
+      "reviews": [
+        {
+          "review_id": "r17",
+          "rating": 5,
+          "text": "Best waterproof shoe I have owned."
+        }
+      ]
     },
     {
       "product_id": "frostline-boot",
       "title": "Frostline Winter Hiker",
       "description": "Waterproof insulated winter boot.",
       "category": "footwear",
-      "price": 154.00,
+      "price": 154.0,
       "stock": 2,
       "seller": "Frostline Supply",
-      "attributes": {"waterproof": true, "size": "9", "color": "tan"},
-      "reviews": [{"review_id": "r18", "rating": 4, "text": "Warm; sizes run half a size big."}]
+      "attributes": {
+        "waterproof": true,
+        "size": "9",
+        "color": "tan"
+      },
+      "reviews": [
+        {
+          "review_id": "r18",
+          "rating": 4,
+          "text": "Warm; sizes run half a size big."
+        }
+      ]
     },
     {
       "product_id": "fogbank-moc",
       "title": "Fogbank Camp Moc",
       "description": "Suede camp slip-on; suede only, no waterproofing claim.",
       "category": "footwear",
-      "price": 39.00,
+      "price": 39.0,
       "stock": 8,
       "seller": "Metrowear",
-      "attributes": {"waterproof": false, "size": "9", "color": "brown"},
+      "attributes": {
+        "waterproof": false,
+        "size": "9",
+        "color": "brown"
+      },
       "reviews": []
     }
   ]

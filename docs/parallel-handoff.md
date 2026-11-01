@@ -10,11 +10,11 @@ The current parsed request also supplies `clarification_needed`, including the e
 
 The public shopping tools are:
 
-- `search(SearchInput) -> SearchResult` (`SearchInput.store_id` required for stores-v1)
+- `search(SearchInput) -> SearchResult` (`store_id` required in multi-store mode)
 - `get_listing(product_id=…, store_id=…, listing_id=…) -> ProductObservation`
-- `add_to_cart(CartSelection) -> CartObservation` (prefer `listing_id` / store+product on stores-v1)
+- `add_to_cart(CartSelection) -> CartObservation` (prefer `listing_id` / store+product in multi-store)
 - `inspect_cart() -> CartObservation`
-- `list_stores() -> list[StoreRecord]` (stores-v1; 404 on single-store)
+- `list_stores() -> list[StoreRecord]` (multi-store; 404 on flat mode)
 
 Use fake implementations of this protocol to start independently. `BudgetedTools` wraps the implementation and counts attempted calls, including failed HTTP requests. Verification is local computation, not an additional network call. Expose an allowlist to your model; keep private reset/state access out of it. No full agent framework is required or used.
 

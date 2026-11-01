@@ -1,16 +1,16 @@
 # Multi-store assortments — exploration
 
-**Status: LOCKED peer sync** · **stores-v1 runtime implemented** (2026-10-30)
+**Status: multi-store is the default benchmark suite** (no staged stores/catalog version cutover)
 
-Branch: `t3/multi-store-assortments`  
-Peer: scrape/ingest (`t3/scraped-catalog-feasibility`) — `ingest-v1` source of truth  
+Branch: `t3/multi-store-benchmark-suite` (stacks on multi-store assortments)  
+Peer: scrape/ingest (`t3/scraped-catalog-feasibility`) — ingest payload is source of truth  
 Parent densify UI: [PR #17](https://github.com/t-goel/Shopping-Agent/pull/17) (catalog ground truth unchanged)
 
 ## Goal
 
 Turn the single Goodthings catalog into **3–5 storefronts** with overlapping and unique SKUs so agents must pick the right store (or search across stores) instead of querying one flat inventory. Evaluator honesty stays intact: attributes/price/stock ground truth remain authoritative; store partitions add navigation/search challenge, not answer-key leakage.
 
-## Alignment with scrape sibling (ingest-v1)
+## Alignment with scrape sibling (ingest)
 
 Confirmed against their opening sketch:
 
@@ -34,7 +34,7 @@ Confirmed against their opening sketch:
 | `summit-outfitters` | Summit Outfitters | Premium outdoor; price-overlap on a few Trailworks winners | `Summit Outfitters` |
 | `headwater-supply` | Headwater Supply | Expedition / specialty; unique big duffels, winter, Umbra | `Headwater Supply` |
 
-Seller strings from catalog-v2 that are **not** their own store (`River Gear`, `Umbra Goods`, `Frostline Supply`) keep their display `seller` on the product and are placed into the nearest specialty store's assortment. See `seller` rule below.
+Seller strings from the flat catalog that are **not** their own store (`River Gear`, `Umbra Goods`, `Frostline Supply`) keep their display `seller` on the product and are placed into the nearest specialty store's assortment. See `seller` rule below.
 
 ## Overlap rules
 
@@ -42,7 +42,7 @@ Seller strings from catalog-v2 that are **not** their own store (`River Gear`, `
 2. **Assortment is the only store-local surface.** `(store_id, product_id) → {price, stock, sponsored}`. Overlap = same product in ≥2 stores; prices may differ (±$3–$15) so lowest-price tasks force a store choice. Stock may differ so availability recovery can be store-scoped later.
 3. **Decoys stay unique.** Keyword-stuffed / sponsored / reseller copies appear in exactly one store (`metrowear` or `clearance-corner`). Agents that only search Metrowear find the trap; the genuine winner lives elsewhere.
 4. **Specialty uniques.** Large expedition / winter / Umbra SKUs live only on `headwater-supply` so "right store" is a real axis.
-5. **Overlap budget (bootstrap).** ~4–6 overlapping SKUs across 20 catalog-v2 products; rest unique. Expand overlaps when scraped/synthetic inventory arrives.
+5. **Overlap budget (bootstrap).** ~4–6 overlapping SKUs across the flat catalog products; rest unique. Expand overlaps when scraped/synthetic inventory arrives.
 6. **No answer-key in store names.** Store branding does not encode task solutions (e.g. no store named "Waterproof Jackets Under 100").
 
 ## `seller` vs `brand_seller`
@@ -52,23 +52,17 @@ Seller strings from catalog-v2 that are **not** their own store (`River Gear`, `
 - Listing observations should expose `store_id` (+ optional store name) **alongside** the product's stable `seller`.
 - **Locked with scrape peer:** schema now documents chrome-only `brand_seller`; `seller_default` is required and is the only path to `Product.seller`.
 
-## API / reset implications (sketch, not implemented yet)
+## API / reset (shipped)
 
-Today: one `Store` instance, flat search, cart keyed by `product_id`.
+`MultiStore` is the default evaluation runtime. Flat `Store` remains for `--mode flat` NL suite.
 
-Proposed additive path:
+1. **Ingest** carries `stores[]` + products + `assortment[]`. Compat export pins `canonical_store_id`; multi-store keeps listings.
+2. **Cart** is marketplace-style keyed by `listing_id`.
+3. **Mutations** target `listing_id` or `(store_id, product_id)`.
+4. **Scoring** uses `valid_listing_ids` when present.
+5. **Reset** reloads products + full assortment matrix.
 
-1. **Catalog file** gains optional `stores[]` + `assortment[]` (or separate `stores.json` + keep products). Loader projects to either:
-   - **Compat mode:** merge assortment into one flat product list (single-store densify UI / existing NL suite keep working).
-   - **Multi mode:** search requires `store_id` (or a new `list_stores` + store-scoped `search`).
-2. **Cart:** either store-scoped carts or a marketplace cart that records `(store_id, product_id)`. Prefer marketplace cart with listing identity so cross-store price wins are checkable.
-3. **Mutations:** target `listing_id` or `(store_id, product_id)` so a price drop on one store does not silently mutate another.
-4. **Scoring:** `valid_product_ids` can stay product-level for bootstrap; later tasks may require a specific `listing_id` / store when overlap prices differ.
-5. **Reset:** still one trial store process; reset reloads products + full assortment matrix.
-
-Do **not** break the NL suite on main until multi-mode is behind an explicit catalog version (e.g. `catalog-v3` / `stores-v1`) and tasks opt in.
-
-## Tool-surface changes (when multi-mode ships)
+## Tool-surface changes
 
 | Tool | Change |
 |---|---|
@@ -141,23 +135,23 @@ Scrape/ingest report (source of truth on their branch): `t3/scraped-catalog-feas
 | Sample overlaps | ridge-shell / harbor / tarn-fell (+ clearance genuine shell) |
 | `brand_seller` | chrome-only |
 | `canonical_store_id` | **required** on ingest products; flat compat uses it only |
-| Public catalog source | **synthetic + ingest-v1** — no wholesale retailer scrape |
+| Public catalog source | **synthetic + ingest** — no wholesale retailer scrape |
 | Cross-thread traffic | done unless a contract conflict appears |
 
 Shipped runtime (not under `output/`):
 
 | Piece | Path |
 |---|---|
-| Ingest example | `mock-store/server/examples/ingest-v1.example.json` |
+| Ingest example | `mock-store/server/examples/ingest.example.json` |
 | Full bootstrap partition | `mock-store/server/examples/stores-partition-v1.json` |
 | Loader / projection | `src/shopping_agent/ingest.py` |
 | Multi-store runtime | `mock-store/server/multi_store.py` |
-| Pilot tasks | `data/tasks/stores/*.json` |
-| Contract sketch | `docs/benchmark/stores-v1-contracts.md` |
+| Suite tasks | `data/tasks/stores/*.json` (default CLI) |
+| Contracts | `docs/benchmark/multi-store-contracts.md` |
 
 Expanded peer sample (6 products / 10 listings): overlaps `ridge-shell`, `harbor-backpack`, `tarn-fell`. Clearance shows genuine shell $99 beside reseller; Headwater `tarn-fell` $88 beats Trailworks $91.
 
-**Compat rule:** use `canonical_store_id` for flat export (catalog-v2-stable), not cheapest-in-stock.
+**Compat rule:** use `canonical_store_id` for flat export, not cheapest-in-stock.
 
 ## Per-store densify chrome (from scrape peer captures)
 
@@ -179,18 +173,18 @@ When multi-store UI densifies after PR #17, aim ~10–15 chrome blocks beyond ti
 ## Next steps
 
 1. ~~Peer sync + design lock~~
-2. ~~stores-v1 runtime + listing-aware scoring~~ — default NL suite still loads catalog-v2 only
-3. Optional: runner CLI flag for `--catalog stores-v1`
+2. ~~Multi-store runtime + listing-aware scoring~~
+3. ~~Default CLI suite is multi-store~~ (`--mode flat` keeps the NL suite)
 4. Densified **per-store** UI chrome after PR #17, using the retailer capture pack as density reference
 5. Keep generated scratch under `output/` (gitignored)
 
 
 ## Design stress findings
 
-Stress-tested during exploration; resolutions landed as **stores-v1** on PR #19 (compat export still optional for the default NL suite).
+Stress-tested during exploration; resolutions landed as **multi-store** on PR #19 (compat export still optional for the default NL suite).
 
 ### 1. Compat-mode projection pitfalls — resolved
-- Overlap SKUs cannot collapse into one scalar `Product` without picking a store; synthetic IDs break `unique_ids` / catalog-v2 tasks.
+- Overlap SKUs cannot collapse into one scalar `Product` without picking a store; synthetic IDs break `unique_ids` / catalog tasks.
 - **Shipped:** `project_compat()` pins `canonical_store_id` price/stock/sponsored and ignores secondary assortment rows. `project_multi()` keeps listings.
 
 ### 2. Cart identity for scoring — resolved
@@ -201,7 +195,7 @@ Stress-tested during exploration; resolutions landed as **stores-v1** on PR #19 
 - Product-scoped mutations would broadcast across every store stocking a SKU.
 - **Shipped:** optional `Mutation.listing_id` / `store_id` via `resolve_mutation_rows()`; unset still product-broadcast for legacy tasks.
 
-### 4. SearchInput store scoping — resolved (stores-v1 path)
+### 4. SearchInput store scoping — resolved (multi-store path)
 - Federated search would erase storefront discovery.
 - **Shipped:** optional `SearchInput.store_id`; multi-store `/api/products` **requires** it (400 if missing); `list_stores()` tool; single-store ignores `store_id`.
 
@@ -209,9 +203,9 @@ Stress-tested during exploration; resolutions landed as **stores-v1** on PR #19 
 - Peer `brand_seller` is chrome-only; `seller_default` → `Product.seller`.
 - **Shipped:** partition loader accepts `notes`/`blurb` and informational `role`.
 
-### 6. Prototype steps — done on stores-v1
+### 6. Prototype steps — done on multi-store
 1. ~~Catalog loader projection~~ — `shopping_agent/ingest.py` (`load_ingest`, `load_partition`, `merge_partition_with_catalog`, `project_compat` / `project_multi`)
-2. ~~Contract extensions~~ — listing/store fields on cart, mutation, search, observations (`docs/benchmark/stores-v1-contracts.md`)
+2. ~~Contract extensions~~ — listing/store fields on cart, mutation, search, observations (`docs/benchmark/multi-store-contracts.md`)
 3. ~~Listing-aware cart & mutations~~ — `mock-store/server/multi_store.py` (product-only cart rejected)
 4. ~~Store-scoped search + `list_stores`~~ — `/api/stores`, `/api/stores/{store_id}/products`, shared `/api/products?store_id=`
 5. ~~Pilot tasks~~ — `data/tasks/stores/multistore_cheapest_waterproof_shell.json` (+ tarn-fell price task)
