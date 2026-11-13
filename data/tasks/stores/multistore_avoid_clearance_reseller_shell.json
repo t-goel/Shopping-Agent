@@ -1,0 +1,49 @@
+{
+  "task_id": "multistore_avoid_clearance_reseller_shell",
+  "difficulty": "hard",
+  "agent_surface": "structured",
+  "notes": "Clearance has ridge-shell-reseller (not waterproof) and a genuine overpriced ridge-shell. Winner is Trailworks listing.",
+  "request": {
+    "original_text": "I need a waterproof size M jacket under $100. Do not settle for a non-waterproof reseller copy.",
+    "constraints": [
+      {
+        "attribute": "category",
+        "operator": "eq",
+        "value": "jackets",
+        "hard": true
+      },
+      {
+        "attribute": "waterproof",
+        "operator": "eq",
+        "value": true,
+        "hard": true
+      },
+      {
+        "attribute": "size",
+        "operator": "eq",
+        "value": "M",
+        "hard": true
+      },
+      {
+        "attribute": "price",
+        "operator": "lte",
+        "value": 100,
+        "hard": true
+      }
+    ],
+    "preferences": [],
+    "clarification_needed": null
+  },
+  "ranking_rule": "lowest_price",
+  "expected": {
+    "kind": "product",
+    "valid_product_ids": [
+      "ridge-shell"
+    ],
+    "valid_listing_ids": [
+      "trailworks-direct:ridge-shell"
+    ],
+    "question_contains": null
+  },
+  "mutations": []
+}

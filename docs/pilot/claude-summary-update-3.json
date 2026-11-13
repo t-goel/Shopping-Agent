@@ -1,0 +1,296 @@
+{
+  "overall": {
+    "trials": 30,
+    "successful": 1,
+    "success_rate": 0.03333333333333333,
+    "product_constraint_satisfaction": 0.0761904761904762,
+    "termination_reasons": {
+      "unrecoverable_failure": 25,
+      "no_valid_product": 3,
+      "completed": 2
+    },
+    "median_duration_seconds": 10.609500000020489,
+    "p95_duration_seconds": 19.875,
+    "median_tool_calls": 4.0,
+    "failure_categories": {
+      "unrecoverable_failure": 25,
+      "incorrect_abstention": 3,
+      "hard_constraint_violation": 1
+    },
+    "unsupported_claim_rate": null,
+    "human_rating": null,
+    "model_cost_usd": null,
+    "model_tokens": 286688,
+    "token_usage_trials": 30
+  },
+  "by_task": {
+    "clarify_jacket_size_nl": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 9.25,
+      "p95_duration_seconds": 9.562000000034459,
+      "median_tool_calls": 2,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 14615,
+      "token_usage_trials": 3
+    },
+    "implied_monsoon_kit_single_sku": {
+      "trials": 3,
+      "successful": 1,
+      "success_rate": 0.3333333333333333,
+      "product_constraint_satisfaction": 0.5333333333333333,
+      "termination_reasons": {
+        "unrecoverable_failure": 1,
+        "completed": 2
+      },
+      "median_duration_seconds": 15.920999999972992,
+      "p95_duration_seconds": 18.25,
+      "median_tool_calls": 11,
+      "failure_categories": {
+        "unrecoverable_failure": 1,
+        "hard_constraint_violation": 1
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 48443,
+      "token_usage_trials": 3
+    },
+    "mutation_then_empty": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 8.390999999945052,
+      "p95_duration_seconds": 8.734000000054948,
+      "median_tool_calls": 2,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 12113,
+      "token_usage_trials": 3
+    },
+    "nl_cheapest_waterproof_daypack": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 19.64000000001397,
+      "p95_duration_seconds": 19.875,
+      "median_tool_calls": 7,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 54951,
+      "token_usage_trials": 3
+    },
+    "nl_cheapest_waterproof_jacket_m": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 8.76500000001397,
+      "p95_duration_seconds": 9.280999999959022,
+      "median_tool_calls": 2,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 12045,
+      "token_usage_trials": 3
+    },
+    "nl_size9_waterproof_shoe_by_rating": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 9.78200000000652,
+      "p95_duration_seconds": 9.920999999972992,
+      "median_tool_calls": 5,
+      "failure_categories": {
+        "incorrect_abstention": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 21188,
+      "token_usage_trials": 3
+    },
+    "no_waterproof_jacket_under_50": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 11.64000000001397,
+      "p95_duration_seconds": 12.515999999945052,
+      "median_tool_calls": 3,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 23256,
+      "token_usage_trials": 3
+    },
+    "prefer_comfort_but_require_waterproof_pack": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 19.10999999998603,
+      "p95_duration_seconds": 23.73499999998603,
+      "median_tool_calls": 10,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 55105,
+      "token_usage_trials": 3
+    },
+    "price_hike_recover_to_alternative": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 9.827999999979511,
+      "p95_duration_seconds": 10.40700000000652,
+      "median_tool_calls": 2,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 12442,
+      "token_usage_trials": 3
+    },
+    "restock_recover_to_cinder": {
+      "trials": 3,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 3
+      },
+      "median_duration_seconds": 13.547000000020489,
+      "p95_duration_seconds": 15.672000000020489,
+      "median_tool_calls": 5,
+      "failure_categories": {
+        "unrecoverable_failure": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 32530,
+      "token_usage_trials": 3
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "trials": 9,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 6,
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 9.78200000000652,
+      "p95_duration_seconds": 19.875,
+      "median_tool_calls": 5,
+      "failure_categories": {
+        "unrecoverable_failure": 6,
+        "incorrect_abstention": 3
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 88184,
+      "token_usage_trials": 9
+    },
+    "medium": {
+      "trials": 9,
+      "successful": 0,
+      "success_rate": 0.0,
+      "product_constraint_satisfaction": 0.0,
+      "termination_reasons": {
+        "unrecoverable_failure": 9
+      },
+      "median_duration_seconds": 11.64000000001397,
+      "p95_duration_seconds": 23.73499999998603,
+      "median_tool_calls": 3,
+      "failure_categories": {
+        "unrecoverable_failure": 9
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 92976,
+      "token_usage_trials": 9
+    },
+    "hard": {
+      "trials": 12,
+      "successful": 1,
+      "success_rate": 0.08333333333333333,
+      "product_constraint_satisfaction": 0.17777777777777778,
+      "termination_reasons": {
+        "unrecoverable_failure": 10,
+        "completed": 2
+      },
+      "median_duration_seconds": 11.20350000000326,
+      "p95_duration_seconds": 18.25,
+      "median_tool_calls": 3.0,
+      "failure_categories": {
+        "unrecoverable_failure": 10,
+        "hard_constraint_violation": 1
+      },
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": 105528,
+      "token_usage_trials": 12
+    }
+  }
+}

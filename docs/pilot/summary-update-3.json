@@ -1,0 +1,171 @@
+{
+  "overall": {
+    "trials": 15,
+    "successful": 15,
+    "success_rate": 1.0,
+    "product_constraint_satisfaction": 1.0,
+    "termination_reasons": {
+      "clarification_needed": 3,
+      "completed": 3,
+      "no_valid_product": 9
+    },
+    "median_duration_seconds": 0.015000000013969839,
+    "p95_duration_seconds": 0.01600000006146729,
+    "median_tool_calls": 6,
+    "failure_categories": {},
+    "unsupported_claim_rate": null,
+    "human_rating": null,
+    "model_cost_usd": null,
+    "model_tokens": null,
+    "token_usage_trials": 0
+  },
+  "by_task": {
+    "cheapest_waterproof_jacket": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": 1.0,
+      "termination_reasons": {
+        "completed": 3
+      },
+      "median_duration_seconds": 0.015000000013969839,
+      "p95_duration_seconds": 0.01600000006146729,
+      "median_tool_calls": 8,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "clarify_jacket_size": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "clarification_needed": 3
+      },
+      "median_duration_seconds": 0.0,
+      "p95_duration_seconds": 0.0,
+      "median_tool_calls": 0,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "no_waterproof_under_50": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 0.0,
+      "p95_duration_seconds": 0.015000000013969839,
+      "median_tool_calls": 6,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "price_change": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 0.015999999945051968,
+      "p95_duration_seconds": 0.015999999945051968,
+      "median_tool_calls": 6,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "stock_change": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 0.015000000013969839,
+      "p95_duration_seconds": 0.015000000013969839,
+      "median_tool_calls": 6,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "trials": 3,
+      "successful": 3,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": 1.0,
+      "termination_reasons": {
+        "completed": 3
+      },
+      "median_duration_seconds": 0.015000000013969839,
+      "p95_duration_seconds": 0.01600000006146729,
+      "median_tool_calls": 8,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "medium": {
+      "trials": 6,
+      "successful": 6,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "clarification_needed": 3,
+        "no_valid_product": 3
+      },
+      "median_duration_seconds": 0.0,
+      "p95_duration_seconds": 0.015000000013969839,
+      "median_tool_calls": 3.0,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    },
+    "hard": {
+      "trials": 6,
+      "successful": 6,
+      "success_rate": 1.0,
+      "product_constraint_satisfaction": null,
+      "termination_reasons": {
+        "no_valid_product": 6
+      },
+      "median_duration_seconds": 0.015000000013969839,
+      "p95_duration_seconds": 0.015999999945051968,
+      "median_tool_calls": 6.0,
+      "failure_categories": {},
+      "unsupported_claim_rate": null,
+      "human_rating": null,
+      "model_cost_usd": null,
+      "model_tokens": null,
+      "token_usage_trials": 0
+    }
+  }
+}
