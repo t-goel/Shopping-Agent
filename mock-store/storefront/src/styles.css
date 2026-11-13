@@ -584,3 +584,15 @@ button { cursor: pointer; }
   .sentiment-grid { grid-template-columns: 1fr; }
   .reviews-breakdown-row { grid-template-columns: 1fr; }
 }
+
+/* Store navigation and authoritative facts remain visible to every shopper. */
+.store-directory { max-width: 1180px; margin: 2rem auto; padding: 0 1.5rem; }
+.store-directory article { display: inline-block; vertical-align: top; width: min(100%, 340px); margin: .75rem; padding: 1.5rem; border: 1px solid #d7e3dc; border-radius: 16px; background: #f6f9f7; }
+.store-directory button { font: inherit; font-weight: 700; color: #174b3f; background: none; border: 0; cursor: pointer; text-align: left; }
+.store-directory dt, .listing-facts dt { font-weight: 650; color: #526d61; }
+.store-directory dd { margin: .25rem 0 1rem; }
+.listing-facts dl { display: grid; grid-template-columns: minmax(110px, 180px) 1fr; gap: .65rem 1rem; }
+.listing-facts dd { margin: 0; overflow-wrap: anywhere; }
+.listing-facts article { border-top: 1px solid #d7e3dc; padding: .75rem 0; }
+nav[aria-label="Stores"] { padding: .7rem 2rem; background: #edf2ef; }
+nav[aria-label="Stores"] button { margin-right: 1rem; padding: .4rem .8rem; cursor: pointer; }

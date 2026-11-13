@@ -50,8 +50,8 @@ def _condition_parts(records: list[TrialResult]):
 def summarize(records: list[TrialResult]):
     # Missing agent_surface is compatible with a single concrete surface (legacy JSONL).
     agents, concrete_surfaces = _condition_parts(records)
-    if len(agents) > 1 or len(concrete_surfaces) > 1:
-        raise ValueError("Report one agent/model/prompt/input surface at a time; do not pool unlike conditions.")
+    if len(agents) > 1 or len(concrete_surfaces) > 1 or len({r.mode for r in records}) > 1:
+        raise ValueError("Report one agent/model/prompt/input surface/transport at a time; do not pool unlike conditions.")
 
     def aggregate(rows):
         times = sorted(r.duration_seconds for r in rows)
@@ -67,6 +67,7 @@ def summarize(records: list[TrialResult]):
             "termination_reasons": dict(Counter(r.termination_reason for r in rows)),
             "median_duration_seconds": median(times) if times else None,
             "p95_duration_seconds": times[math.ceil(.95 * len(times)) - 1] if times else None,
+            "median_browser_actions": median(r.browser_action_count for r in rows) if rows and rows[0].mode == "browser" else None,
             "median_tool_calls": median(r.tool_calls for r in rows) if rows else None,
             "failure_categories": dict(Counter(failure_category(r) for r in rows if not r.is_successful)),
             "unsupported_claim_rate": None, "human_rating": None,
@@ -87,6 +88,7 @@ def summarize(records: list[TrialResult]):
         "model_id": sample.model_id if sample else None,
         "prompt_id": sample.prompt_id if sample else None,
         "agent_surface": surface,
+        "transport": sample.mode if sample else None,
     }
     return {
         "identity": identity,
@@ -231,6 +233,8 @@ def markdown_report(records):
         f"- Model: `{identity['model_id']}`",
         f"- Prompt: `{identity['prompt_id']}`",
         f"- Input surface: `{identity['agent_surface']}`",
+        f"- Transport: `{identity['transport']}`",
+        f"- Median browser actions: `{overall['median_browser_actions']}`",
         f"- Tokens (input/output/total): "
         f"`{overall['input_tokens']}` / `{overall['output_tokens']}` / `{overall['model_tokens']}` "
         f"across `{overall['token_usage_trials']}` measured trials",

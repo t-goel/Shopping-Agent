@@ -74,3 +74,11 @@ and [reviewed pilot records](docs/pilot/rules-2026-10-12-reviewed.jsonl).
 A visually checked [Update 2 PDF draft](output/pdf/project-update-2-draft.pdf) is included.
 It remains a draft until the team supplies all four names and actual contribution statements.
 The original pilot records are retained alongside the rerun after the reviewer fixes.
+
+## Browser evaluation
+
+Use `--transport browser` to run the same shopping tools through Chromium UI
+navigation and DOM observations. `--mode multi-store` (default) and `--mode flat`
+select the benchmark independently. The runner starts isolated local servers and
+browsers automatically. See [browser setup, commands, artifacts, and evaluation
+limits](docs/browser-evaluation.md).

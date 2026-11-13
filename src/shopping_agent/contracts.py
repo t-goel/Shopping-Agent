@@ -237,6 +237,8 @@ class TrialResult(Contract):
     evidence: list[EvidenceItem] = Field(default_factory=list)
     constraints_satisfied: int = Field(ge=0)
     total_constraints: int = Field(ge=0)
+    browser_actions: list[dict] = Field(default_factory=list)
+    browser_action_count: int = Field(default=0, ge=0)
     tool_calls: int = Field(ge=0)
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
