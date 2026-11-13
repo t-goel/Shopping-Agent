@@ -11,7 +11,7 @@ class ToolTrace(Contract):
     sequence: int
     name: str
     inputs: dict
-    observation: dict | None = None
+    observation: dict | list | None = None
     error: str | None = None
     duration_seconds: float = 0
 

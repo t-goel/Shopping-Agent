@@ -39,6 +39,9 @@ def main(argv=None):
         default="multi-store",
         help="multi-store is the default harder suite; flat keeps the single-catalog NL suite",
     )
+    run.add_argument("--transport", choices=("api", "browser"), default="api")
+    run.add_argument("--headed", action="store_true", help="Show Chromium in browser trials")
+    run.add_argument("--artifacts-dir", type=Path, default=None)
     run.add_argument("--tasks", type=Path, default=None)
     run.add_argument("--catalog", type=Path, default=None)
     run.add_argument("--output", type=Path, required=True)
@@ -74,6 +77,7 @@ def main(argv=None):
             catalog, tasks, args.output, args.repetitions, args.seed,
             args.max_calls, args.timeout, args.agent,
             on_result=None if args.json else print_trial_line,
+            transport=args.transport, headed=args.headed, artifact_root=args.artifacts_dir,
         )
     else:
         records = read_records(args.input)

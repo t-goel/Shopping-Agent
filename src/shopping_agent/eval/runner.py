@@ -1,6 +1,9 @@
 """Sequential, process-isolated trials with private store setup and scoring."""
 
+from contextlib import contextmanager
 import hashlib
+import signal
+import uuid
 import os
 import subprocess
 import multiprocessing
@@ -129,7 +132,9 @@ def failure_record(task, trial_number, reason, duration, trace, error, config) -
         task_id=task.task_id,
         **config["agent"],
         trial_number=trial_number,
-        mode="api",
+        mode=config.get("transport", "api"),
+        browser_actions=list(config.get("browser_actions", {}).values()),
+        browser_action_count=sum(event["kind"] != "read_dom" for event in config.get("browser_actions", {}).values()),
         selected_product_ids=[],
         response_text="Trial interrupted before a final result.",
         constraints_satisfied=0,
@@ -156,6 +161,20 @@ def _build_store(catalog: CatalogExample | IngestCatalog, task: TaskDefinition):
     return create_app, store
 
 
+@contextmanager
+def transport_session(app, transport, artifact_dir, headed, on_action):
+    if transport == "browser":
+        from shopping_agent.tools.browser import browser_session
+        with browser_session(app, artifact_dir, headed=headed, on_action=on_action) as tools:
+            yield tools
+    elif transport == "api":
+        from starlette.testclient import TestClient
+        with TestClient(app) as client:
+            yield CatalogAPI(client)
+    else:
+        raise ValueError("transport must be api or browser")
+
+
 def run_trial(
     catalog: CatalogExample | IngestCatalog,
     task: TaskDefinition,
@@ -164,26 +183,46 @@ def run_trial(
     seconds: float = 60,
     agent=None,
     on_trace=None,
+    transport="api",
+    artifact_dir=None,
+    headed=False,
+    on_action=None,
+    on_started=None,
+    on_finished=None,
 ) -> TrialResult:
     """Worker core; suite's parent process supplies the noncooperative deadline."""
-    from starlette.testclient import TestClient
-
     create_app, store = _build_store(catalog, task)
     config = metadata(max_calls, seconds)
+    config["transport"] = transport
+    if transport == "browser":
+        artifact_dir = Path(artifact_dir or ROOT / "results/browser-artifacts" / uuid.uuid4().hex)
+        config["browser_artifacts"] = str(artifact_dir.resolve())
     selected_agent, agent_name = validate_experiment(task=task, agent=agent)
     config["agent"] = agent_metadata(selected_agent)
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
     config["catalog_sha256"] = hashlib.sha256(catalog.model_dump_json().encode()).hexdigest()
 
-    with TestClient(create_app(store)) as client:
+    with transport_session(create_app(store), transport, artifact_dir, headed, on_action) as adapter:
+        if transport == "browser":
+            from shopping_agent.tools.browser import DIST
+            frontend_hash = hashlib.sha256()
+            for path in sorted(DIST.rglob("*")):
+                if path.is_file():
+                    frontend_hash.update(str(path.relative_to(DIST)).encode())
+                    frontend_hash.update(path.read_bytes())
+            config.update(frontend_sha256=frontend_hash.hexdigest(),
+                          playwright=version("playwright"), chromium=adapter.browser_version,
+                          headed=headed, viewport={"width": 1440, "height": 1000})
         tools = BudgetedTools(
-            CatalogAPI(client),
+            adapter,
             max_calls=max_calls,
             seconds=seconds,
             on_trace=on_trace,
         )
         start = monotonic()
+        if on_started:
+            on_started()
         error = None
 
         try:
@@ -202,6 +241,8 @@ def run_trial(
             output = AgentOutput(response_text="Trial failed.", termination_reason="unrecoverable_failure")
 
         duration = monotonic() - start
+        if on_finished:
+            on_finished()
         snapshot = store.snapshot()
         success, satisfied, total = score(task, output, snapshot)
 
@@ -211,7 +252,7 @@ def run_trial(
             input_tokens=getattr(selected_agent, "input_tokens", None),
             output_tokens=getattr(selected_agent, "output_tokens", None),
             trial_number=trial_number,
-            mode="api",
+            mode=config.get("transport", "api"),
             selected_product_ids=output.selected_product_ids,
             selected_listing_ids=output.selected_listing_ids,
             response_text=output.response_text,
@@ -238,18 +279,27 @@ def run_trial(
             final_state=snapshot,
             error=error,
             agent_diagnostics=output.diagnostics,
+            browser_actions=getattr(adapter, "actions", []),
+            browser_action_count=sum(event["kind"] != "read_dom" for event in getattr(adapter, "actions", [])),
             run_metadata=config,
         )
 
 
-def _worker(send, catalog, task, trial_number, max_calls, seconds, agent):
+def _worker(send, catalog, task, trial_number, max_calls, seconds, agent, transport, artifact_dir, headed):
     try:
-        send.send(("started", None))
+        if transport == "browser" and os.name == "posix":
+            os.setsid()  # Chromium and Playwright inherit this worker's process group.
 
         def on_trace(event):
             send.send(("trace", event.model_dump(mode="json")))
 
-        result = run_trial(catalog, task, trial_number, max_calls, seconds, agent, on_trace)
+        result = run_trial(
+            catalog, task, trial_number, max_calls, seconds, agent, on_trace,
+            transport=transport, artifact_dir=artifact_dir, headed=headed,
+            on_action=lambda event: send.send(("browser_action", event)),
+            on_started=lambda: send.send(("started", None)),
+            on_finished=lambda: send.send(("finished", None)),
+        )
         send.send(("result", result.model_dump(mode="json")))
 
     except Exception as exc:
@@ -266,19 +316,30 @@ def isolated_trial(
     max_calls: int = 20,
     seconds: float = 60,
     agent=None,
+    transport="api",
+    artifact_dir=None,
+    headed=False,
 ) -> TrialResult:
     if max_calls < 1 or seconds <= 0:
         raise ValueError("budgets must be positive")
 
     selected_agent, _ = validate_experiment(task=task, agent=agent)
+    if transport not in {"api", "browser"}:
+        raise ValueError("transport must be api or browser")
+    if transport == "browser":
+        artifact_dir = Path(artifact_dir or ROOT / "results/browser-artifacts" / uuid.uuid4().hex)
+        artifact_dir.mkdir(parents=True, exist_ok=True)
     context = multiprocessing.get_context("spawn")
     receive, send = context.Pipe(duplex=False)
     process = context.Process(
         target=_worker,
-        args=(send, catalog, task, trial_number, max_calls, seconds, selected_agent),
+        args=(send, catalog, task, trial_number, max_calls, seconds, selected_agent, transport, artifact_dir, headed),
     )
     config = metadata(max_calls, seconds)
     config["agent"] = agent_metadata(selected_agent)
+    config["transport"] = transport
+    if transport == "browser":
+        config["browser_artifacts"] = str(Path(artifact_dir).resolve())
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
     config["catalog_sha256"] = hashlib.sha256(catalog.model_dump_json().encode()).hexdigest()
@@ -288,6 +349,8 @@ def isolated_trial(
     start = monotonic()
     deadline = start + 60  # Separate bounded worker-startup allowance.
     traces = {}
+    browser_actions = {}
+    config["browser_actions"] = browser_actions
 
     try:
         while True:
@@ -321,6 +384,12 @@ def isolated_trial(
                 start = monotonic()
                 deadline = start + seconds
 
+            elif kind == "finished":
+                deadline = monotonic() + 15  # bounded scoring/artifact/teardown allowance
+
+            elif kind == "browser_action":
+                browser_actions[payload["sequence"]] = payload
+
             elif kind == "trace":
                 traces[payload["sequence"]] = payload
 
@@ -340,11 +409,24 @@ def isolated_trial(
 
     finally:
         if process.is_alive():
-            process.terminate()
+            if transport == "browser" and os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    process.terminate()
+            elif transport == "browser" and os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+            else:
+                process.terminate()
 
         process.join(timeout=2)
 
         if process.is_alive():
+            if transport == "browser" and os.name == "posix":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             process.kill()
             process.join()
 
@@ -361,11 +443,22 @@ def run_suite(
     seconds: float = 60,
     agent_name: str = "rules",
     on_result=None,
+    transport="api",
+    artifact_root=None,
+    headed=False,
 ) -> list[TrialResult]:
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
 
     validate_experiment(tasks=tasks, agent_name=agent_name)
+    if transport not in {"api", "browser"}:
+        raise ValueError("transport must be api or browser")
+    if headed and transport != "browser":
+        raise ValueError("--headed requires --transport browser")
+    if transport == "browser":
+        from shopping_agent.tools.browser import require_browser
+        require_browser()
+    artifact_root = Path(artifact_root or output.parent / (output.stem + "-artifacts"))
     output.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     results: list[TrialResult] = []
@@ -378,7 +471,11 @@ def run_suite(
 
             for position, task_id in enumerate(order):
                 agent, _ = select_agent(agent_name=agent_name)
-                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds, agent)
+                result = isolated_trial(
+                    catalog, tasks[task_id], repetition, max_calls, seconds, agent,
+                    transport=transport, headed=headed,
+                    artifact_dir=artifact_root / f"{repetition}-{task_id}-{uuid.uuid4().hex[:8]}" if transport == "browser" else None,
+                )
                 result.run_metadata.update(seed=seed, task_order=order, task_position=position)
                 stream.write(result.model_dump_json() + "\n")
                 stream.flush()

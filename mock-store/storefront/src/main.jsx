@@ -15,7 +15,9 @@ async function readJson(url, options) {
   const response = await fetch(url, options);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || `Store request failed (${response.status})`);
+    const error = new Error(body.detail || `Store request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
@@ -32,6 +34,13 @@ function Stars({ rating }) {
 }
 
 function App() {
+  const [stores, setStores] = useState(null);
+  const [activeStore, setActiveStore] = useState(null);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [cartProducts, setCartProducts] = useState({});
   const [products, setProducts] = useState([]);
   const [catalog, setCatalog] = useState([]);
   const [query, setQuery] = useState('');
@@ -51,34 +60,57 @@ function App() {
   const [fulfillment, setFulfillment] = useState('shipping');
   const [accordion, setAccordion] = useState({ details: true });
 
+  const productKey = p => p.listing_id || p.product_id;
+  const scopedProducts = store => `/api/products${store ? `?store_id=${encodeURIComponent(store.store_id)}` : ''}`;
+
   useEffect(() => {
-    Promise.all([readJson('/api/products'), readJson('/api/cart')])
-      .then(([items, basket]) => {
-        setProducts(items);
-        setCatalog(items);
-        setCart(basket);
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    async function initialize() {
+      try {
+        let directory;
+        try { directory = await readJson('/api/stores'); }
+        catch (err) { if (err.status !== 404) throw err; directory = null; }
+        setStores(directory);
+        setDirectoryOpen(directory !== null);
+        if (directory === null) {
+          const items = await readJson('/api/products');
+          setProducts(items); setCatalog(items);
+        }
+        setCart(await readJson('/api/cart'));
+      } catch (err) { setError(err.message); }
+      finally { setLoading(false); setReady(true); }
+    }
+    initialize();
   }, []);
+
+  async function chooseStore(store) {
+    setBusy(true); setLoading(true); setError(''); setSelected(null);
+    setActiveStore(store); setQuery(''); setCategory('All'); setBrand('All'); setMinStars(0);
+    try {
+      const items = await readJson(scopedProducts(store));
+      setProducts(items); setCatalog(items); setDirectoryOpen(false);
+      window.location.hash = store ? `store/${store.store_id}` : 'shop';
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); setBusy(false); setRevision(n => n + 1); }
+  }
 
   async function search(event) {
     event.preventDefault();
-    setLoading(true);
+    setBusy(true); setLoading(true);
     setError('');
     setCategory('All');
     setSelected(null);
     try {
-      setProducts(await readJson(`/api/products?q=${encodeURIComponent(query.trim())}`));
+      setProducts(await readJson(`/api/products?q=${encodeURIComponent(query.trim())}${activeStore ? `&store_id=${encodeURIComponent(activeStore.store_id)}` : ''}`));
     } catch (err) {
       setProducts([]);
       setError(err.message);
     } finally {
-      setLoading(false);
+      setLoading(false); setBusy(false); setRevision(n => n + 1);
     }
   }
 
   async function openProduct(product) {
+    setBusy(true); setSelected(null);
     setError('');
     setNotice('');
     setCondition('new');
@@ -87,15 +119,19 @@ function App() {
     setCoupon(false);
     setProtect(false);
     try {
-      setSelected(await readJson(`/api/products/${encodeURIComponent(product.product_id)}`));
+      const path = product.listing_id ? `/api/listings/${encodeURIComponent(product.listing_id)}` : `/api/products/${encodeURIComponent(product.product_id)}${activeStore ? `?store_id=${encodeURIComponent(activeStore.store_id)}` : ''}`;
+      const listing = await readJson(path);
+      setSelected(listing);
+      window.location.hash = `listing/${encodeURIComponent(productKey(listing))}`;
       window.scrollTo(0, 0);
     } catch (err) {
       setError(err.message);
-    }
+    } finally { setBusy(false); setRevision(n => n + 1); }
   }
 
   async function addToCart(product, quantity = 1) {
-    setError('');
+    setBusy(true); setError('');
+    setCartProducts(previous => ({ ...previous, [productKey(product)]: product }));
     setNotice('');
     try {
       let basket = cart;
@@ -103,17 +139,14 @@ function App() {
         basket = await readJson('/api/cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_id: product.product_id, quantity: 1 }),
+          body: JSON.stringify({ product_id: product.product_id, listing_id: product.listing_id, store_id: product.store_id, quantity: 1 }),
         });
       }
       setCart(basket);
       setCartOpen(true);
     } catch (err) {
       setError(err.message);
-      try {
-        setSelected(await readJson(`/api/products/${encodeURIComponent(product.product_id)}`));
-      } catch { /* keep error */ }
-    }
+    } finally { setBusy(false); setRevision(n => n + 1); }
   }
 
   async function addBundle(ids) {
@@ -127,7 +160,7 @@ function App() {
         basket = await readJson('/api/cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_id: id, quantity: 1 }),
+          body: JSON.stringify({ product_id: id, listing_id: item.listing_id, store_id: item.store_id, quantity: 1 }),
         });
       }
       setCart(basket);
@@ -152,7 +185,7 @@ function App() {
 
   const cartCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
   const cartLines = cart.items.map(item => {
-    const product = catalog.find(p => p.product_id === item.product_id);
+    const product = cartProducts[item.listing_id || item.product_id] || catalog.find(p => productKey(p) === (item.listing_id || item.product_id));
     return { item, product };
   });
   const images = selected ? productImages(selected) : [];
@@ -191,8 +224,10 @@ function App() {
           <input id="product-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search the trail shop" />
           <button type="submit">Search</button>
         </form>
-        <button type="button" className="cart-btn" onClick={() => setCartOpen(true)}>Bag ({cartCount})</button>
+        <button type="button" aria-label="Open bag" className="cart-btn" onClick={async () => { setBusy(true); setError(''); try { setCart(await readJson('/api/cart')); setCartOpen(true); } catch (err) { setError(err.message); } finally { setBusy(false); setRevision(n => n + 1); } }}>Bag ({cartCount})</button>
       </header>
+      <div data-testid="storefront-state" data-revision={revision} data-ready={ready} data-busy={busy} data-mode={stores === null ? 'flat' : 'multi-store'} />
+      {stores && <nav aria-label="Stores"><button onClick={() => { setDirectoryOpen(true); setSelected(null); setError(''); }}>Browse stores</button><span> {activeStore?.name || 'Choose a store'}</span></nav>}
       <nav className="subnav" aria-label="Shortcuts">
         <button type="button" onClick={() => { setSelected(null); setCategory('All'); }}>All</button>
         <button type="button" onClick={() => { setSelected(null); setCategory('jackets'); }}>Jackets</button>
@@ -205,14 +240,21 @@ function App() {
       {error && <p className="banner error" role="alert">{error}</p>}
       {notice && <p className="banner notice" role="status">{notice}</p>}
 
-      {selected ? (
-        <main className="pdp">
+      {directoryOpen ? (
+        <main className="store-directory" aria-label="Store directory"><h1>Our stores</h1>{stores?.map(store => (
+          <article key={store.store_id} data-testid="store-card">
+            <h2><button onClick={() => chooseStore(store)}>{store.name}</button></h2>
+            <dl><dt>Store ID</dt><dd data-field="store_id">{store.store_id}</dd><dt>Brand seller</dt><dd data-field="brand_seller">{store.brand_seller}</dd><dt>About</dt><dd data-field="notes">Browse {store.brand_seller} gear and current listings.</dd></dl>
+          </article>
+        ))}</main>
+      ) : selected ? (
+        <main className="pdp" data-testid="listing-detail">
           <p className="crumbs">Outdoor / {selected.category} / {selected.title}</p>
           <div className="pdp-split">
             <section className="photo-stream" aria-label="Product photos">
               {images.map((src, i) => (
                 <figure key={src + i} className="photo-stream-card">
-                  <img src={src} alt={`${selected.title} view ${i + 1}`} loading={i === 0 ? 'eager' : 'lazy'} />
+                  <img onError={event => { if (!event.currentTarget.src.endsWith('/images/offline-product.svg')) event.currentTarget.src = '/images/offline-product.svg'; }} src={src} alt={`${selected.title} view ${i + 1}`} loading={i === 0 ? 'eager' : 'lazy'} />
                   <figcaption className="photo-stream-caption">
                     {PHOTO_STREAM_CAPTIONS[i] || `Field perspective ${i + 1}`}
                   </figcaption>
@@ -366,7 +408,7 @@ function App() {
               </label>
 
               <label className="qty-inline">Qty
-                <select value={qty} onChange={e => setQty(Number(e.target.value))}>
+                <select aria-label="Quantity" value={qty} onChange={e => setQty(Number(e.target.value))}>
                   {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>
@@ -383,6 +425,7 @@ function App() {
               <button
                 type="button"
                 className="cta-primary"
+                aria-label="Add selected listing to bag"
                 disabled={selected.stock === 0 && condition === 'new'}
                 onClick={() => {
                   const target = condition === 'used' && resellerProduct ? resellerProduct : selected;
@@ -466,6 +509,18 @@ function App() {
             </aside>
           </div>
 
+          <section aria-label="Listing facts" data-testid="listing-facts" className="full-specs-section listing-facts">
+            <h2>Listing facts</h2>
+            <dl>{Object.entries({ product_id: selected.product_id, listing_id: selected.listing_id || '', store_id: selected.store_id || '', title: selected.title, description: selected.description, category: selected.category, price: selected.price, currency: selected.currency, stock: selected.stock, seller: selected.seller, sponsored: selected.sponsored }).map(([field, value]) => (
+              <React.Fragment key={field}><dt>{field.replaceAll('_', ' ')}</dt><dd data-field={field}>{String(value)}</dd></React.Fragment>
+            ))}</dl>
+            <h3>Attributes</h3><dl data-testid="listing-attributes">{Object.entries(selected.attributes).map(([field, value]) => (
+              <React.Fragment key={field}><dt>{field}</dt><dd data-attribute={field}>{String(value)}</dd></React.Fragment>
+            ))}</dl>
+            <h3>Customer reviews</h3>{selected.reviews.map(review => (
+              <article data-testid="listing-review" key={review.review_id}><p data-field="review_id">{review.review_id}</p><p>Rating: <span data-field="rating">{review.rating}</span> / 5</p><p data-field="text">{review.text}</p></article>
+            ))}
+          </section>
           <section className="full-specs-section">
             <h2>Specifications & trail fit</h2>
             <div className="specs-table-wrapper">
@@ -617,7 +672,7 @@ function App() {
                 {fbtProducts.map(p => (
                   <button type="button" className="kit-card" key={p.product_id} onClick={() => openProduct(p)}>
                     <div className="kit-card-img-wrap">
-                      <img src={productImages(p)[0]} alt="" />
+                      <img onError={event => { if (!event.currentTarget.src.endsWith('/images/offline-product.svg')) event.currentTarget.src = '/images/offline-product.svg'; }} src={productImages(p)[0]} alt="" />
                       <span className="kit-badge">{p.category}</span>
                     </div>
                     <span className="kit-title">{p.title}</span>
@@ -644,7 +699,7 @@ function App() {
                 {siblings.map(p => (
                   <article key={p.product_id} className="shelf-card">
                     <button type="button" className="shelf-img-btn" onClick={() => openProduct(p)}>
-                      <img src={productImages(p)[0]} alt="" />
+                      <img onError={event => { if (!event.currentTarget.src.endsWith('/images/offline-product.svg')) event.currentTarget.src = '/images/offline-product.svg'; }} src={productImages(p)[0]} alt="" />
                     </button>
                     <div className="shelf-meta">
                       <span className="shelf-kicker">{p.seller} · {p.category}</span>
@@ -673,7 +728,7 @@ function App() {
             </section>
           )}
 
-          <button type="button" className="back" onClick={() => setSelected(null)}>← Back to results</button>
+          <button type="button" className="back" onClick={() => { setSelected(null); setError(''); }}>← Back to results</button>
         </main>
       ) : (
         <main className="results-layout">
@@ -707,13 +762,13 @@ function App() {
             {loading ? <p role="status">Loading products…</p> : visible.length === 0 ? <p>No products found.</p> : (
               <div className="result-list">
                 {visible.map(product => (
-                  <article className="result-card" key={product.product_id}>
+                  <article className="result-card" data-testid="result-card" key={productKey(product)}>
                     <button type="button" className="thumb-wrap" onClick={() => openProduct(product)}>
-                      <img src={productImages(product)[0]} alt="" />
+                      <img onError={event => { if (!event.currentTarget.src.endsWith('/images/offline-product.svg')) event.currentTarget.src = '/images/offline-product.svg'; }} src={productImages(product)[0]} alt="" />
                     </button>
                     <div className="result-body">
                       {product.sponsored && <p className="sponsored-muted">Promoted listing</p>}
-                      <h2><button type="button" className="title-link" onClick={() => openProduct(product)}>{product.title}</button></h2>
+                      <h2><button type="button" data-testid="open-listing" className="title-link" onClick={() => openProduct(product)}>{product.title}</button></h2><p>Item <span data-field="product_id">{product.product_id}</span>{product.listing_id && <> · Listing <span data-field="listing_id">{product.listing_id}</span></>}</p>
                       <Stars rating={product.rating} />
                       <span className="rev-count">{product.review_count} ratings</span>
                       {choiceBadge(product) && <p className="choice-badge">Staff pick</p>}
@@ -758,9 +813,9 @@ function App() {
               ) : (
                 <ul className="cart-lines">
                   {cartLines.map(({ item, product }) => (
-                    <li key={item.product_id}>
+                    <li key={item.listing_id || item.product_id} data-testid="cart-line">
                       <div className="cart-thumb">
-                        <img
+                        <img onError={event => { if (!event.currentTarget.src.endsWith('/images/offline-product.svg')) event.currentTarget.src = '/images/offline-product.svg'; }}
                           src={product ? productImages(product)[0] : FALLBACK_PRODUCT_IMAGE}
                           alt=""
                         />
@@ -768,10 +823,12 @@ function App() {
                       <div className="cart-meta">
                         <p className="cart-title">{product?.title || item.product_id}</p>
                         <p className="cart-sub">{product?.seller || 'Goodthings'} · {product?.category || 'gear'}</p>
-                        <p className="cart-sub">Qty {item.quantity}</p>
-                        <p className="cart-price">{money(item.unit_price)} each</p>
+                        <p className="cart-sub">Qty <span data-field="quantity">{item.quantity}</span></p>
+                        <p>Item <span data-field="product_id">{item.product_id}</span> · Listing <span data-field="listing_id">{item.listing_id || ''}</span> · Store <span data-field="store_id">{item.store_id || ''}</span></p>
+                        <p>Available: <span data-field="in_stock">{String(item.in_stock)}</span></p>
+                        <p className="cart-price"><span data-field="unit_price">{item.unit_price.toFixed(2)}</span> {cart.currency} each</p>
                       </div>
-                      <p className="cart-line-total">{money(item.line_total)}</p>
+                      <p className="cart-line-total"><span data-field="line_total">{item.line_total.toFixed(2)}</span> {cart.currency}</p>
                     </li>
                   ))}
                 </ul>
@@ -781,7 +838,7 @@ function App() {
             <footer className="cart-foot">
               <div className="cart-summary">
                 <span>Subtotal</span>
-                <strong>{money(cart.total)}</strong>
+                <strong><span data-testid="cart-total">{cart.total.toFixed(2)}</span> <span data-testid="cart-currency">{cart.currency}</span></strong>
               </div>
               <p className="cart-note">Shipping & taxes calculated later · checkout is mocked</p>
               <button
