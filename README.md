@@ -48,7 +48,11 @@ key is required. Run from this checkout; the mock-store application is not bundl
 in a standalone wheel.
 
 The baseline receives supplied structured requests and ranking rules, not expected
-answers. It does not evaluate language parsing, an LLM, or browser navigation.
+answers. The live Claude entry point first uses a schema-constrained Claude
+interpretation call to convert free-form language into a validated
+`ShoppingRequest`, then runs the shopping/tool-use loop. Parser accuracy is not
+measured by the current structured-request pilot. The pilot does not evaluate
+browser navigation.
 The clarification task supplies `request.clarification_needed`, including the exact
 question. Its successful trials measure routing a supplied clarification instruction,
 not discovering ambiguity. Expected outcome objects are hidden, but this parsed input

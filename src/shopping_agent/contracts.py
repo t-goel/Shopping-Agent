@@ -37,6 +37,29 @@ class ShoppingRequest(Contract):
     clarification_needed: str | None = None
 
 
+class RequestInterpretation(Contract):
+    request: ShoppingRequest
+    ranking_rule: Literal["lowest_price", "highest_rating", "none"]
+
+
+class ClaudeClaim(Contract):
+    field: str = Field(min_length=1)
+    value: Attribute
+
+
+class ClaudeAnswer(Contract):
+    status: Literal["completed", "no_valid_product"]
+    product_id: str = ""
+    claims: list[ClaudeClaim] = Field(default_factory=list)
+    response: str = ""
+
+    @model_validator(mode="after")
+    def completed_requires_product(self):
+        if self.status == "completed" and not self.product_id:
+            raise ValueError("completed answer needs product_id")
+        return self
+
+
 class Review(Contract):
     review_id: str = Field(min_length=1)
     rating: int = Field(ge=1, le=5)
