@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from shopping_agent.comparison import matches
 from shopping_agent.contracts import Constraint, Product, TrialResult
+from shopping_agent.eval.prose_claims import aggregate_prose_audits, audit_prose_claims
 from shopping_agent.interfaces import Claim
 
 
@@ -92,6 +93,7 @@ def audit_trial(record: TrialResult):
                 entry["status"] = "supports" if matches(product, Constraint(
                     attribute=claim.field, operator="eq", value=claim.value)) else "contradicts"
         result["claims"].append(entry)
+    result.update(audit_prose_claims(record))
     return result
 
 
@@ -99,8 +101,9 @@ def audit_records(records, input_bytes: bytes | None = None):
     trials = [audit_trial(record) for record in records]
     claims = Counter(c["status"] for trial in trials for c in trial["claims"])
     assessed = claims["supports"] + claims["contradicts"]
+    prose = aggregate_prose_audits(trials)
     report = {
-        "audit_version": "final-state-v1",
+        "audit_version": "prose-observations-v1",
         "summary": {
             "trials": len(trials),
             "selection_cart_consistency": dict(Counter(t["selection_cart_consistency"] for t in trials)),
@@ -110,14 +113,16 @@ def audit_records(records, input_bytes: bytes | None = None):
             "structured_claim_contradiction_rate": claims["contradicts"] / assessed if assessed else None,
             "trials_with_claims": sum(bool(t["claims"]) for t in trials),
             "response_title_review_trials": sum(bool(t["response_title_review"]) for t in trials),
+            **prose,
         },
         "limitations": [
             "This audit does not change benchmark success or compare agent performance.",
-            "Claim checks cover only declared scalar facts, evaluated at final-state time.",
-            "Missing facts/snapshots are unassessable; absent claims are not verified prose.",
+            "Structured claim checks cover declared scalar facts, evaluated at final-state time.",
+            "Prose claims are atomic product facts extracted from the explanation and checked against the latest recorded get_listing observation, with final state only when no listing was recorded.",
+            "Unsupported-claim rate is contradicted prose facts divided by prose facts that could be checked. Trials with no extracted facts stay out of that denominator.",
+            "Extraction misses aliases, implicit references, and facts that do not name a recorded product title.",
             "Exact off-cart title mentions require human review; alternatives and negation can be legitimate.",
             "Title review covers all termination reasons; purchased titles are excluded.",
-            "No title flags does not prove prose consistency; aliases and implicit references are not parsed.",
         ],
         "trials": trials,
     }
