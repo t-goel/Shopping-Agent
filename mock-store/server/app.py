@@ -156,6 +156,10 @@ def create_app(store: Store | MultiStore | None = None) -> FastAPI:
         request: Request,
         store_id: str | None = Query(default=None),
     ):
+        if ":" in product_id:
+            store_part, prod_part = product_id.split(":", 1)
+            store_id = store_id or store_part
+            product_id = prod_part
         product = store.get_product(product_id, store_id=store_id)
         resolved_store = store_id
         lid = None

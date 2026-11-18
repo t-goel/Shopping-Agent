@@ -48,15 +48,32 @@ class ClaudeClaim(Contract):
 
 
 class ClaudeAnswer(Contract):
-    status: Literal["completed", "no_valid_product"]
+    status: Literal["completed", "no_valid_product", "clarification_needed"]
     product_id: str = ""
+    listing_id: str | None = None
+    store_id: str | None = None
     claims: list[ClaudeClaim] = Field(default_factory=list)
     response: str = ""
 
     @model_validator(mode="after")
     def completed_requires_product(self):
-        if self.status == "completed" and not self.product_id:
+        if self.status == "completed" and not self.product_id and not self.listing_id:
             raise ValueError("completed answer needs product_id")
+        if self.product_id and ":" in self.product_id:
+            inferred_store, bare_product = self.product_id.split(":", 1)
+            if not self.listing_id:
+                self.listing_id = self.product_id
+            if not self.store_id:
+                self.store_id = inferred_store
+            self.product_id = bare_product
+        elif self.listing_id and not self.product_id:
+            if ":" in self.listing_id:
+                inferred_store, bare_product = self.listing_id.split(":", 1)
+                self.product_id = bare_product
+                if not self.store_id:
+                    self.store_id = inferred_store
+            else:
+                self.product_id = self.listing_id
         return self
 
 
@@ -217,10 +234,33 @@ class EvidenceItem(Contract):
 
 
 class CartSelection(Contract):
-    product_id: str
+    product_id: str | None = None
     quantity: int = Field(ge=1)
     store_id: str | None = None
     listing_id: str | None = None
+
+    @model_validator(mode="after")
+    def normalize_identifiers(self):
+        if not self.product_id and not self.listing_id:
+            raise ValueError("product_id or listing_id is required")
+        if self.product_id and ":" in self.product_id:
+            inferred_store, bare_product = self.product_id.split(":", 1)
+            if not self.listing_id:
+                self.listing_id = self.product_id
+            if not self.store_id:
+                self.store_id = inferred_store
+            self.product_id = bare_product
+        elif self.listing_id and not self.product_id:
+            if ":" in self.listing_id:
+                inferred_store, bare_product = self.listing_id.split(":", 1)
+                self.product_id = bare_product
+                if not self.store_id:
+                    self.store_id = inferred_store
+            else:
+                self.product_id = self.listing_id
+        if self.store_id and self.product_id and not self.listing_id:
+            self.listing_id = f"{self.store_id}:{self.product_id}"
+        return self
 
 
 class TrialResult(Contract):

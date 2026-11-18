@@ -136,7 +136,9 @@ class BudgetedTools:
             raise BudgetExceeded("timeout")
         return result
 
-    def add_to_cart(self, selection: CartSelection):
+    def add_to_cart(self, selection: CartSelection | str):
+        if isinstance(selection, str):
+            selection = CartSelection(product_id=selection, quantity=1)
         return self._call("add_to_cart", selection)
 
     def inspect_cart(self):

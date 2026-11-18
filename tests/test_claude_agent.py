@@ -245,3 +245,80 @@ def test_multi_store_claude_search_requires_store_id_and_carts_listing():
     assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
     assert result.tool_trace[0]["name"] == "list_stores"
     assert result.tool_trace[1]["inputs"]["store_id"] == "trailworks-direct"
+
+
+def test_multi_store_claude_passes_listing_id_in_product_id():
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    # Claude passes listing_id in product_id field without explicit listing_id/store_id
+    decision = '''{"status":"completed","product_id":"trailworks-direct:ridge-shell",
+      "response":"Trailworks Ridge Shell is the cheapest waterproof shell.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"jackets"},
+                     {"attribute":"waterproof","operator":"eq","value":true}],
+      "ranking_rule":"lowest_price","claims":[{"field":"price","value":89}]}'''
+    agent = ScriptedClaude([
+        list_stores(),
+        search("jackets", store_id="trailworks-direct"),
+        final(decision),
+    ])
+    result = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"], agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.selected_product_ids == ["ridge-shell"]
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+
+
+def test_multi_store_claude_passes_listing_id_only():
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    # Claude passes listing_id only with empty product_id
+    decision = '''{"status":"completed","product_id":"",
+      "listing_id":"trailworks-direct:ridge-shell",
+      "response":"Trailworks Ridge Shell is the cheapest waterproof shell.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"jackets"},
+                     {"attribute":"waterproof","operator":"eq","value":true}],
+      "ranking_rule":"lowest_price","claims":[{"field":"price","value":89}]}'''
+    agent = ScriptedClaude([
+        list_stores(),
+        search("jackets", store_id="trailworks-direct"),
+        final(decision),
+    ])
+    result = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"], agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.selected_product_ids == ["ridge-shell"]
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+
+
+def test_multi_store_claude_uses_get_listing_with_inverted_params():
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    decision = '''{"status":"completed","product_id":"ridge-shell",
+      "listing_id":"trailworks-direct:ridge-shell","store_id":"trailworks-direct",
+      "response":"Trailworks Ridge Shell is the cheapest waterproof shell.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"jackets"},
+                     {"attribute":"waterproof","operator":"eq","value":true}],
+      "ranking_rule":"lowest_price","claims":[{"field":"price","value":89}]}'''
+    get_listing_inverted = {
+        "role": "assistant",
+        "content": [
+            {
+                "type": "tool_use",
+                "id": "tool_call_gl",
+                "name": "get_listing",
+                "input": {"product_id": "trailworks-direct:ridge-shell"},
+            }
+        ],
+    }
+    agent = ScriptedClaude([
+        list_stores(),
+        search("jackets", store_id="trailworks-direct"),
+        get_listing_inverted,
+        final(decision),
+    ])
+    result = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"], agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.selected_product_ids == ["ridge-shell"]
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+
