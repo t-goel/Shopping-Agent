@@ -211,13 +211,19 @@ def test_model_budget_omission_is_not_silently_injected():
       "constraints":[{"attribute":"category","operator":"eq","value":"bags"},
                      {"attribute":"waterproof","operator":"eq","value":true}],
       "ranking_rule":"lowest_price"}'''
+    abstain = '''{"status":"no_valid_product","product_id":"","response":"No bag meets the $70 budget.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"bags"},
+                     {"attribute":"waterproof","operator":"eq","value":true},
+                     {"attribute":"price","operator":"lte","value":70}],
+      "ranking_rule":"lowest_price","claims":[]}'''
     result = run_trial(catalog, tasks["implied_monsoon_kit_single_sku"],
-                       agent=ScriptedClaude([search("bags"), final(decision)]))
+                       agent=ScriptedClaude([search("bags"), final(decision), final(abstain)]))
     # With query interpreter routing on NL tasks, the extracted budget ($70) is enforced at verification;
-    # Claude's over-budget pick fails verification rather than being placed in the cart.
+    # Claude's over-budget pick fails verification, feedback is returned, and the model abstains.
     assert result.selected_product_ids == []
     assert result.termination_reason == "no_valid_product"
     assert not result.is_successful
+    assert result.agent_diagnostics.get("verification_rejections")
 
 
 def test_clarification_is_not_nudged_into_a_purchase():
