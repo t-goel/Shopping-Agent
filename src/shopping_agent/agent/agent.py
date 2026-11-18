@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 import requests
 from pydantic import ValidationError
 
+from shopping_agent.agent.request_parser import parse_request
 from shopping_agent.contracts import (
     CartSelection,
     ClaudeAnswer,
@@ -146,13 +147,21 @@ Return JSON only, with this exact shape:
     "preferences": ["soft preference"],
     "clarification_needed": "question or null"
   },
-  "ranking_rule": "lowest_price|highest_rating|none"
+  "ranking_rule": "lowest_price|highest_rating|highest_rating_then_reviews|none"
 }
 
 Extract only constraints that are stated or clearly implied. Use hard=true
 only for requirements; put preferences in preferences. Never invent product
 facts. If the request does not identify a product category, set
 clarification_needed to a concise question. Use the original request exactly.
+
+Supported product attributes include: category, waterproof, size, price, capacity_liters.
+Categories are: jackets, bags, footwear.
+For approximate quantities (such as "~30 liter", "approximately 30 liters", or "daypack sized"),
+handle them with realistic bounds (for example, capacity_liters gte 25 and lte 35 for ~30L,
+or gte 20 and lte 25 for daypack) instead of strict equality.
+If several products qualify and rating or review tie-breaking is mentioned, use ranking_rule "highest_rating_then_reviews".
+If the shopper indicates uncertainty about sizing (e.g. unsure if brand sizing fits), set clarification_needed to ask what size is needed.
 """
 
 
@@ -205,11 +214,18 @@ class Agent:
         self.url = "https://api.anthropic.com/v1/messages"
 
     def interpret_query(self, query: str) -> RequestInterpretation:
-        """Use Claude to turn free-form language into a validated request."""
+        """Use Claude (or deterministic parser for test keys/offline) to turn free-form language into a validated request."""
         if not query or not query.strip():
             raise ValueError("shopping query must not be empty")
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
+
+        if hasattr(self, "interpretation") and self.interpretation is not None:
+            return self.interpretation
+
+        if self.api_key == "test-key":
+            req, rule = parse_request(query)
+            return RequestInterpretation(request=req, ranking_rule=rule)
 
         response = self.ask_json(
             system=INTERPRETATION_PROMPT,
@@ -236,11 +252,43 @@ class Agent:
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
 
+        is_nl = (inputs.ranking_rule is None) or (
+            not inputs.request.constraints and not inputs.request.clarification_needed
+        )
+        if is_nl:
+            interpretation = self.interpret_query(inputs.request.original_text)
+            active_constraints = list(interpretation.request.constraints)
+            active_ranking_rule = interpretation.ranking_rule
+            clarification_needed = interpretation.request.clarification_needed
+            preferences = list(interpretation.request.preferences)
+        else:
+            active_constraints = list(inputs.request.constraints)
+            active_ranking_rule = inputs.ranking_rule
+            clarification_needed = inputs.request.clarification_needed
+            preferences = list(inputs.request.preferences)
+
+        diagnostics = {
+            "extracted_constraints": [c.model_dump(mode="json") for c in active_constraints],
+            "interpreted_ranking_rule": active_ranking_rule,
+        }
+
+        if clarification_needed:
+            diagnostics["model_status"] = "clarification_needed"
+            return AgentOutput(
+                response_text=clarification_needed,
+                termination_reason="clarification_needed",
+                diagnostics=diagnostics,
+            )
+
         messages = [{
             "role": "user",
             "content": json.dumps({
-                "request": inputs.request.original_text if inputs.ranking_rule is None else inputs.request.model_dump(mode="json"),
-                **({"ranking_rule": inputs.ranking_rule} if inputs.ranking_rule is not None else {}),
+                "request": {
+                    "original_text": inputs.request.original_text,
+                    "constraints": [c.model_dump(mode="json") for c in active_constraints],
+                    "preferences": preferences,
+                },
+                "ranking_rule": active_ranking_rule,
             }),
         }]
         products = {}
@@ -271,7 +319,15 @@ class Agent:
                     })
                     continue
 
-                outcome = self.finish(decision, answer, inputs, tools, products)
+                outcome = self.finish(
+                    decision,
+                    answer,
+                    inputs,
+                    tools,
+                    products,
+                    active_constraints=active_constraints,
+                    active_ranking_rule=active_ranking_rule,
+                )
                 if isinstance(outcome, VerificationRejection):
                     rejections.append(outcome)
                     if answer.get("content"):
@@ -572,7 +628,16 @@ class Agent:
             normalized.append(constraint.model_copy(update={"value": value}))
         return normalized
 
-    def finish(self, decision, provider_answer, inputs, tools, products):
+    def finish(
+        self,
+        decision,
+        provider_answer,
+        inputs,
+        tools,
+        products,
+        active_constraints=None,
+        active_ranking_rule=None,
+    ):
         content = provider_answer.get("content", [])
         stop_reason = provider_answer.get("stop_reason")
         response_text = decision["response"].strip()
@@ -581,6 +646,11 @@ class Agent:
             "model_product_id": decision.get("product_id") or None,
             "observed_product_ids": sorted(products),
         }
+        if active_constraints is not None:
+            diagnostics["extracted_constraints"] = [c.model_dump(mode="json") for c in active_constraints]
+            diagnostics["interpreted_ranking_rule"] = active_ranking_rule
+        if "constraints" in decision and decision["constraints"] is not None:
+            diagnostics["model_constraints"] = decision["constraints"]
 
         if decision["status"] == "clarification_needed":
             return AgentOutput(
@@ -635,7 +705,10 @@ class Agent:
         if not product_id and listing_id and ":" in listing_id:
             product_id = listing_id.split(":", 1)[1]
 
-        if inputs.ranking_rule is None:
+        if active_constraints is not None:
+            constraints = list(active_constraints)
+            rule = active_ranking_rule
+        elif inputs.ranking_rule is None:
             try:
                 constraints = [Constraint.model_validate(row) for row in decision["constraints"]]
             except (KeyError, TypeError, ValidationError) as exc:

@@ -57,6 +57,15 @@ does not identify a product category, Claude is instructed to populate
 Pydantic contract rejects malformed constraints or invalid ranking values before
 the shopping loop can use them.
 
+### Figure 1 Architecture & Natural-Language Pipeline Reconciliation
+
+Previously, Figure 1 noted that natural-language benchmark tasks bypassed the query interpreter and entered the ReAct loop directly. Because runtime verification only checked whatever constraints the model parsed during its run, parsing mistakes could allow non-compliant items to pass verification or trigger false abstentions (notably where Claude abstained on the 30-liter waterproof pack task despite a valid qualifying bag being in stock).
+
+We resolved this by reconciling the natural-language pipeline with the interpreter architecture:
+1. **Query Interpreter Pipeline:** All natural-language requests now route through the typed query interpreter (`interpret_query` / `parse_request`) prior to tool execution, providing verified typed constraints and ranking rules before the shopping loop begins.
+2. **Constraint Logging & Runtime Verification:** Extracted constraints and interpreted ranking rules are logged in trial diagnostics under `extracted_constraints` and `interpreted_ranking_rule`. Runtime verification validates candidate products against these extracted constraints, preventing model parsing errors or omitted constraints from letting invalid items pass or causing false abstentions.
+3. **Realistic Bounds for Approximate Quantities:** Approximate capacity statements (such as "~30 liters", "approximately 30 liters", or "daypack sized") are parsed into realistic bounds (e.g. 25–35 liters for ~30L, 20–25 liters for daypacks) rather than strict equality, and the constraint/comparison layer supports numeric tolerances.
+
 One full-suite run had 39 passing tests and one pre-existing
 `test_public_adapter_and_budget_record_http_errors` failure: the installed
 HTTP client raised an exception from a different imported HTTPX module than

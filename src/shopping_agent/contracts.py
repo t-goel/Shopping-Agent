@@ -28,6 +28,18 @@ class Constraint(Contract):
     operator: Operator
     value: Attribute
     hard: bool = True
+    tolerance: float | None = None
+
+    def model_dump(self, *args, **kwargs):
+        data = super().model_dump(*args, **kwargs)
+        if data.get("tolerance") is None:
+            data.pop("tolerance", None)
+        return data
+
+    def model_dump_json(self, *args, **kwargs):
+        if "exclude_none" not in kwargs:
+            kwargs["exclude_none"] = True
+        return super().model_dump_json(*args, **kwargs)
 
 
 class ShoppingRequest(Contract):
@@ -39,7 +51,9 @@ class ShoppingRequest(Contract):
 
 class RequestInterpretation(Contract):
     request: ShoppingRequest
-    ranking_rule: Literal["lowest_price", "highest_rating", "none"]
+    ranking_rule: Literal[
+        "lowest_price", "highest_rating", "highest_rating_then_reviews", "none"
+    ]
 
 
 class ClaudeClaim(Contract):
@@ -54,6 +68,10 @@ class ClaudeAnswer(Contract):
     store_id: str | None = None
     claims: list[ClaudeClaim] = Field(default_factory=list)
     response: str = ""
+    constraints: list[Constraint] = Field(default_factory=list)
+    ranking_rule: Literal[
+        "lowest_price", "highest_rating", "highest_rating_then_reviews", "none"
+    ] | None = None
 
     @model_validator(mode="after")
     def completed_requires_product(self):
