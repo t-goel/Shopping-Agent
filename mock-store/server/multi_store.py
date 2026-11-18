@@ -236,7 +236,7 @@ class MultiStore:
         listing_id: str | None = None,
         store_id: str | None = None,
     ) -> Cart:
-        """Add to cart using listing_id or (store_id, product_id). No silent canonical fallback."""
+        """Add to cart using listing_id or (store_id, product_id). Resolves unambiguous product_id."""
         with self._lock:
             self._apply_due_mutations()
             if quantity < 1:
@@ -246,6 +246,23 @@ class MultiStore:
                 target_listing_id = listing_id
             elif store_id and product_id:
                 target_listing_id = listing_id_for(store_id, product_id)
+            elif product_id and not store_id:
+                # If product_id contains a colon, it was passed as a listing_id
+                if ":" in product_id:
+                    target_listing_id = product_id
+                else:
+                    matching = [r for r in self.listings.values() if r.product_id == product_id]
+                    if len(matching) == 1:
+                        target_listing_id = matching[0].listing_id
+                    elif len(matching) > 1:
+                        options = [r.listing_id for r in sorted(matching, key=lambda x: x.listing_id)]
+                        raise StoreError(
+                            f"Ambiguous product_id '{product_id}' matches multiple store listings: {options}. "
+                            f"Specify listing_id or store_id.",
+                            422,
+                        )
+                    else:
+                        raise StoreError(f"product '{product_id}' not found in any store", 404)
             else:
                 raise StoreError(
                     "listing_id or (store_id and product_id) required",

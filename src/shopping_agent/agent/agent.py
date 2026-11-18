@@ -51,15 +51,27 @@ TOOLS = [
     {
         "name": "get_listing",
         "description": (
-            "Get current details for one product. Prefer listing_id when search returned "
-            "one; otherwise pass product_id with store_id on multi-store catalogs."
+            "Get current details for one product listing. "
+            "A listing_id has the format 'store_id:product_id' (e.g. 'trailworks-direct:ridge-shell'); "
+            "a product_id is just the product part (e.g. 'ridge-shell'). "
+            "In multi-store mode, pass listing_id alone OR product_id together with store_id. "
+            "Do NOT pass a bare product_id without store_id on multi-store catalogs."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "product_id": {"type": "string"},
-                "store_id": {"type": "string"},
-                "listing_id": {"type": "string"},
+                "product_id": {
+                    "type": "string",
+                    "description": "The product identifier (e.g. 'ridge-shell'). Requires store_id on multi-store catalogs.",
+                },
+                "store_id": {
+                    "type": "string",
+                    "description": "Store identifier (e.g. 'trailworks-direct'). Required with product_id on multi-store catalogs.",
+                },
+                "listing_id": {
+                    "type": "string",
+                    "description": "Store-specific listing identifier in 'store_id:product_id' format (e.g. 'trailworks-direct:ridge-shell'). When provided, product_id and store_id are ignored.",
+                },
             },
         },
     },
@@ -334,6 +346,15 @@ class Agent:
                 listing_id = None
             if isinstance(store_id, str) and not store_id.strip():
                 store_id = None
+            # Auto-resolve: product_id that looks like a listing_id ("store:product")
+            if not listing_id and product_id and ":" in product_id:
+                listing_id = product_id
+                product_id = None
+                store_id = None
+            # Auto-resolve: listing_id that looks like a bare product_id (no colon)
+            if listing_id and ":" not in listing_id:
+                product_id = listing_id
+                listing_id = None
             return tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
         if name == "inspect_cart":
             return tools.inspect_cart()
@@ -444,11 +465,26 @@ class Agent:
         product_id = decision.get("product_id")
         if not isinstance(product_id, str) or not product_id.strip():
             raise ClaudeResponseError(stop_reason, content, "completed decision missing product_id")
+        product_id = product_id.strip()
 
         listing_id = decision.get("listing_id") if isinstance(decision.get("listing_id"), str) else ""
         store_id = decision.get("store_id") if isinstance(decision.get("store_id"), str) else ""
         listing_id = listing_id.strip() or None
         store_id = store_id.strip() or None
+
+        # If product_id contains a colon, it was passed as a listing_id ("store_id:product_id")
+        if ":" in product_id:
+            inferred_store, bare_product = product_id.split(":", 1)
+            listing_id = listing_id or product_id
+            store_id = store_id or inferred_store
+            product_id = bare_product
+
+        # If listing_id contains no colon but store_id and product_id exist
+        if listing_id and ":" not in listing_id:
+            if not product_id:
+                product_id = listing_id
+            listing_id = None
+
         prior = products.get(listing_id) if listing_id else None
         if prior is None:
             prior = products.get(product_id)
