@@ -24,7 +24,7 @@ Evaluation: all 36 automated tests passed on Python 3.12. Regression coverage in
 
 The clarification task supplies the exact question in `request.clarification_needed`; its 3/3 results measure instruction routing, not ambiguity detection. Expected outcome objects are withheld, but these structured inputs provide assistance. Before comparing LLM conditions, we will use a common input policy or evaluate ambiguity detection separately.
 
-Product-outcome hard-constraint satisfaction was 100% across three trials of the single product-selection task. The remaining outcomes were abstentions or clarification and are not included in this metric. Claim-audit rate and human ratings are unmeasured; model tokens/cost are not applicable to this baseline. Fifteen trials repeat only five tasks, so these results demonstrate pilot plumbing and objective outcomes, not general shopping ability, comparative improvement, or statistical significance.
+Product-outcome hard-constraint satisfaction was 100% across three trials of the single product-selection task. The remaining outcomes were abstentions or clarification and are not included in this metric. Human ratings are unmeasured. Unsupported-claim rate is now computed after each run from product facts extracted out of the explanation and checked against recorded listing observations; that pilot predates the check, so its saved summary still has a null rate. Model tokens/cost are not applicable to this baseline. Fifteen trials repeat only five tasks, so these results demonstrate pilot plumbing and objective outcomes, not general shopping ability, comparative improvement, or statistical significance.
 
 ## 3. Challenges and Solutions
 

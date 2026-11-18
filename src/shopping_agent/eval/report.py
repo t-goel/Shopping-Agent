@@ -9,6 +9,7 @@ from collections import Counter
 from statistics import median
 
 from shopping_agent.contracts import TrialResult
+from shopping_agent.eval.prose_claims import unsupported_claim_rate
 
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -69,7 +70,7 @@ def summarize(records: list[TrialResult]):
             "p95_duration_seconds": times[math.ceil(.95 * len(times)) - 1] if times else None,
             "median_tool_calls": median(r.tool_calls for r in rows) if rows else None,
             "failure_categories": dict(Counter(failure_category(r) for r in rows if not r.is_successful)),
-            "unsupported_claim_rate": None, "human_rating": None,
+            "unsupported_claim_rate": unsupported_claim_rate(rows), "human_rating": None,
             "model_cost_usd": (sum(r.cost_usd for r in rows)
                                if rows and all(r.cost_usd is not None for r in rows) else None),
             "input_tokens": sum(r.input_tokens for r in rows) if input_ok else None,
@@ -265,6 +266,7 @@ def markdown_report(records):
         "Categories describe observed outcomes; root causes require trace inspection.",
         "Repeated trials are not independent tasks. API timings are not browser timings.",
         "Missing token/cost measurements remain null; no price estimate is invented.",
+        "Unsupported-claim rate is the share of explanation facts that contradict recorded listing observations. It is null when the run states no checkable product fact.",
         "",
     ])
     return "\n".join(lines)

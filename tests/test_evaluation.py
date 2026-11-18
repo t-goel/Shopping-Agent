@@ -167,7 +167,9 @@ def test_cooperative_timeout_and_failure_denominator():
     assert report["overall"]["success_rate"] == .5
     assert report["overall"]["product_constraint_satisfaction"] == .5
     assert report["by_difficulty"]["hard"]["success_rate"] is None
-    assert report["overall"]["unsupported_claim_rate"] is None
+    # The completed rules explanation states the selected price; the aborted trial states none.
+    assert report["overall"]["unsupported_claim_rate"] == 0
+    assert report["by_task"]["cheapest_waterproof_jacket"]["unsupported_claim_rate"] == 0
     now = [0.0]
     tools = BudgetedTools(object(), seconds=1, clock=lambda: now[0])
     now[0] = 2
