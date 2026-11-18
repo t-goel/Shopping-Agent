@@ -73,6 +73,20 @@ class CatalogAPI:
         store_id: str | None = None,
         listing_id: str | None = None,
     ) -> ProductObservation:
+        # Normalize: if product_id contains a colon, caller passed a listing_id
+        if not listing_id and product_id and ":" in product_id:
+            listing_id = product_id
+            product_id = None
+            store_id = None
+        # Normalize: if listing_id doesn't contain a colon, caller passed a bare product_id
+        if listing_id and ":" not in listing_id:
+            if store_id:
+                listing_id = f"{store_id}:{listing_id}"
+            else:
+                if not product_id:
+                    product_id = listing_id
+                listing_id = None
+
         if listing_id:
             response = self._request("GET", f"/api/listings/{quote(listing_id, safe='')}")
             return self._observation(response.json())
@@ -94,7 +108,13 @@ class CatalogAPI:
         )
 
     def add_to_cart(self, selection: CartSelection) -> CartObservation:
-        return self._cart(self._request("POST", "/api/cart", json=selection.model_dump()))
+        payload = selection.model_dump()
+        if not payload.get("listing_id") and payload.get("product_id") and ":" in payload["product_id"]:
+            payload["listing_id"] = payload["product_id"]
+            payload["product_id"] = payload["product_id"].split(":", 1)[1]
+        elif payload.get("listing_id") and ":" in payload["listing_id"] and not payload.get("product_id"):
+            payload["product_id"] = payload["listing_id"].split(":", 1)[1]
+        return self._cart(self._request("POST", "/api/cart", json=payload))
 
     def inspect_cart(self) -> CartObservation:
         return self._cart(self._request("GET", "/api/cart"))

@@ -9,6 +9,7 @@ from server.app import create_app
 from server.multi_store import MultiStore, load_multi_store_examples
 from server.state import StoreError
 from shopping_agent.contracts import (
+    CartSelection,
     ExpectedOutcome,
     Mutation,
     ShoppingRequest,
@@ -409,3 +410,105 @@ def test_listing_scoped_mutation_isolation():
             api.get("/api/listings/summit-outfitters:ridge-shell").json()["price"]
             == 94.0
         )
+
+
+def test_add_to_cart_unambiguous_product_id_resolution():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+
+    # 'ridge-shell-reseller' exists only in clearance-corner
+    cart = store.add_to_cart(product_id="ridge-shell-reseller", quantity=1)
+    assert len(cart.items) == 1
+    assert cart.items[0].listing_id == "clearance-corner:ridge-shell-reseller"
+    assert cart.items[0].store_id == "clearance-corner"
+
+    # Also test via API endpoint
+    with TestClient(create_app(store)) as api:
+        res = api.post("/api/cart", json={"product_id": "meadow-sling", "quantity": 1})
+        assert res.status_code == 200
+        items = res.json()["items"]
+        assert any(item["listing_id"] == "metrowear:meadow-sling" for item in items)
+
+
+def test_add_to_cart_ambiguous_product_id_error_message():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+
+    # 'ridge-shell' exists in 3 stores: trailworks-direct, summit-outfitters, clearance-corner
+    with pytest.raises(StoreError) as exc:
+        store.add_to_cart(product_id="ridge-shell", quantity=1)
+    assert exc.value.status == 422
+    assert "Ambiguous product_id 'ridge-shell'" in str(exc.value)
+    assert "trailworks-direct:ridge-shell" in str(exc.value)
+    assert "summit-outfitters:ridge-shell" in str(exc.value)
+    assert "Specify listing_id or store_id" in str(exc.value)
+
+    # Also test via API endpoint
+    with TestClient(create_app(store)) as api:
+        res = api.post("/api/cart", json={"product_id": "ridge-shell", "quantity": 1})
+        assert res.status_code == 422
+        assert "Ambiguous product_id 'ridge-shell'" in res.json()["detail"]
+
+
+def test_get_listing_unambiguous_and_ambiguous_resolution():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+
+    # Unambiguous product id in get_listing
+    listing = store.get_listing("meadow-sling")
+    assert listing.listing_id == "metrowear:meadow-sling"
+    assert listing.store_id == "metrowear"
+
+    # Ambiguous product id in get_listing
+    with pytest.raises(StoreError) as exc:
+        store.get_listing("ridge-shell")
+    assert exc.value.status == 422
+    assert "Ambiguous product_id 'ridge-shell'" in str(exc.value)
+
+    with TestClient(create_app(store)) as api:
+        res_ok = api.get("/api/listings/meadow-sling")
+        assert res_ok.status_code == 200
+        assert res_ok.json()["listing_id"] == "metrowear:meadow-sling"
+
+        res_ambig = api.get("/api/listings/ridge-shell")
+        assert res_ambig.status_code == 422
+        assert "Ambiguous product_id 'ridge-shell'" in res_ambig.json()["detail"]
+
+
+def test_catalog_api_listing_id_resolution():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+    with TestClient(create_app(store)) as client:
+        api = CatalogAPI(client)
+
+        # Pass listing_id in product_id argument
+        obs = api.get_listing("trailworks-direct:ridge-shell")
+        assert obs.listing_id == "trailworks-direct:ridge-shell"
+        assert obs.store_id == "trailworks-direct"
+
+        # Pass bare product_id in listing_id argument with store_id
+        obs2 = api.get_listing(listing_id="ridge-shell", store_id="summit-outfitters")
+        assert obs2.listing_id == "summit-outfitters:ridge-shell"
+        assert obs2.store_id == "summit-outfitters"
+
+        # Pass unambiguous product_id to get_listing
+        obs3 = api.get_listing("meadow-sling")
+        assert obs3.product.product_id == "meadow-sling"
+
+        # Add to cart with listing_id in product_id field
+        cart = api.add_to_cart(CartSelection(product_id="trailworks-direct:ridge-shell", quantity=1))
+        assert len(cart.items) == 1
+        assert cart.items[0].listing_id == "trailworks-direct:ridge-shell"
+
+
+def test_api_product_endpoint_accepts_listing_id():
+    ingest, tasks = load_multi_store_examples()
+    store = MultiStore(ingest, tasks)
+    with TestClient(create_app(store)) as api:
+        res = api.get("/api/products/trailworks-direct:ridge-shell")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["product_id"] == "ridge-shell"
+        assert data["store_id"] == "trailworks-direct"
+        assert data["listing_id"] == "trailworks-direct:ridge-shell"
+

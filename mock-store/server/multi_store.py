@@ -181,10 +181,21 @@ class MultiStore:
             return [self.as_product_view(row) for row in matched[:limit]]
 
     def get_listing(self, listing_id: str) -> AssortmentRow:
-        """Get live assortment row by listing_id."""
+        """Get live assortment row by listing_id. Resolves unambiguous product_id."""
         with self._lock:
             self._apply_due_mutations()
             listing = self.listings.get(listing_id)
+            if listing is None and ":" not in listing_id:
+                matching = [r for r in self.listings.values() if r.product_id == listing_id]
+                if len(matching) == 1:
+                    listing = matching[0]
+                elif len(matching) > 1:
+                    options = [r.listing_id for r in sorted(matching, key=lambda x: x.listing_id)]
+                    raise StoreError(
+                        f"Ambiguous product_id '{listing_id}' matches multiple store listings: {options}. "
+                        f"Specify listing_id or store_id.",
+                        422,
+                    )
             if listing is None:
                 raise StoreError("listing not found", 404)
             self.observations += 1
@@ -194,6 +205,10 @@ class MultiStore:
         """Get product view by (store_id, product_id) or canonical store when store_id omitted."""
         with self._lock:
             self._apply_due_mutations()
+            if ":" in product_id:
+                inferred_store, bare_prod = product_id.split(":", 1)
+                store_id = store_id or inferred_store
+                product_id = bare_prod
             if store_id is None:
                 product = self.products.get(product_id)
                 if product is None:
@@ -236,16 +251,52 @@ class MultiStore:
         listing_id: str | None = None,
         store_id: str | None = None,
     ) -> Cart:
-        """Add to cart using listing_id or (store_id, product_id). No silent canonical fallback."""
+        """Add to cart using listing_id or (store_id, product_id). Resolves unambiguous product_id."""
         with self._lock:
             self._apply_due_mutations()
             if quantity < 1:
                 raise StoreError("quantity must be positive", 422)
 
             if listing_id:
-                target_listing_id = listing_id
+                if ":" in listing_id:
+                    target_listing_id = listing_id
+                else:
+                    if store_id:
+                        target_listing_id = listing_id_for(store_id, listing_id)
+                    else:
+                        matching = [r for r in self.listings.values() if r.product_id == listing_id]
+                        if len(matching) == 1:
+                            target_listing_id = matching[0].listing_id
+                        elif len(matching) > 1:
+                            options = [r.listing_id for r in sorted(matching, key=lambda x: x.listing_id)]
+                            raise StoreError(
+                                f"Ambiguous product_id '{listing_id}' matches multiple store listings: {options}. "
+                                f"Specify listing_id or store_id.",
+                                422,
+                            )
+                        else:
+                            raise StoreError(f"product '{listing_id}' not found in any store", 404)
             elif store_id and product_id:
+                if ":" in product_id:
+                    product_id = product_id.split(":", 1)[1]
                 target_listing_id = listing_id_for(store_id, product_id)
+            elif product_id and not store_id:
+                # If product_id contains a colon, it was passed as a listing_id
+                if ":" in product_id:
+                    target_listing_id = product_id
+                else:
+                    matching = [r for r in self.listings.values() if r.product_id == product_id]
+                    if len(matching) == 1:
+                        target_listing_id = matching[0].listing_id
+                    elif len(matching) > 1:
+                        options = [r.listing_id for r in sorted(matching, key=lambda x: x.listing_id)]
+                        raise StoreError(
+                            f"Ambiguous product_id '{product_id}' matches multiple store listings: {options}. "
+                            f"Specify listing_id or store_id.",
+                            422,
+                        )
+                    else:
+                        raise StoreError(f"product '{product_id}' not found in any store", 404)
             else:
                 raise StoreError(
                     "listing_id or (store_id and product_id) required",

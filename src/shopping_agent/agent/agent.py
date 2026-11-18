@@ -51,15 +51,27 @@ TOOLS = [
     {
         "name": "get_listing",
         "description": (
-            "Get current details for one product. Prefer listing_id when search returned "
-            "one; otherwise pass product_id with store_id on multi-store catalogs."
+            "Get current details for one product listing. "
+            "A listing_id has the format 'store_id:product_id' (e.g. 'trailworks-direct:ridge-shell'); "
+            "a product_id is just the product part (e.g. 'ridge-shell'). "
+            "In multi-store mode, pass listing_id alone OR product_id together with store_id. "
+            "Do NOT pass a bare product_id without store_id on multi-store catalogs."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "product_id": {"type": "string"},
-                "store_id": {"type": "string"},
-                "listing_id": {"type": "string"},
+                "product_id": {
+                    "type": "string",
+                    "description": "The product identifier (e.g. 'ridge-shell'). Requires store_id on multi-store catalogs.",
+                },
+                "store_id": {
+                    "type": "string",
+                    "description": "Store identifier (e.g. 'trailworks-direct'). Required with product_id on multi-store catalogs.",
+                },
+                "listing_id": {
+                    "type": "string",
+                    "description": "Store-specific listing identifier in 'store_id:product_id' format (e.g. 'trailworks-direct:ridge-shell'). When provided, product_id and store_id are ignored.",
+                },
             },
         },
     },
@@ -81,13 +93,15 @@ overlapping products sold in multiple stores.
 Use observed attributes rather than titles or sponsored placement. If a required size
 is missing, ask for it. Do not guess facts. Return a JSON object as your final text:
 {"status":"completed|no_valid_product|clarification_needed",
- "product_id":"id or empty string",
- "listing_id":"store_id:product_id when known, else empty string",
+ "product_id":"bare product id (e.g. 'ridge-shell') or empty string",
+ "listing_id":"store-specific 'store_id:product_id' (e.g. 'trailworks-direct:ridge-shell') when known, else empty string",
  "store_id":"store id when known, else empty string",
  "response":"short explanation or question",
  "constraints":[{"attribute":"category","operator":"eq","value":"jackets","hard":true}],
  "ranking_rule":"lowest_price|highest_rating|highest_rating_then_reviews|none",
  "claims":[{"field":"price","value":89}]}
+In multi-store mode, pass the store-specific listing_id ('store_id:product_id') so the chosen
+store offering is purchased.
 For a natural-language request, constraints and ranking_rule must represent your own
 interpretation of that request; they are not supplied by the evaluator. Include all
 hard requirements. For a rating tie, follow the shopper's review-count instruction.
@@ -334,9 +348,34 @@ class Agent:
                 listing_id = None
             if isinstance(store_id, str) and not store_id.strip():
                 store_id = None
+            # Auto-resolve: product_id that looks like a listing_id ("store:product")
+            if not listing_id and product_id and ":" in product_id:
+                listing_id = product_id
+                product_id = None
+                store_id = None
+            # Auto-resolve: listing_id that looks like a bare product_id (no colon)
+            if listing_id and ":" not in listing_id:
+                if store_id:
+                    listing_id = f"{store_id}:{listing_id}"
+                else:
+                    if not product_id:
+                        product_id = listing_id
+                    listing_id = None
             return tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
         if name == "inspect_cart":
             return tools.inspect_cart()
+        if name == "add_to_cart":
+            listing_id = arguments.get("listing_id") or None
+            product_id = arguments.get("product_id") or None
+            store_id = arguments.get("store_id") or None
+            quantity = arguments.get("quantity", 1)
+            selection = CartSelection(
+                product_id=product_id,
+                quantity=quantity,
+                store_id=store_id,
+                listing_id=listing_id,
+            )
+            return tools.add_to_cart(selection)
         raise ValueError("Unknown tool: " + str(name))
 
     def read_answer(self, answer, inputs=None):
@@ -441,20 +480,41 @@ class Agent:
         if decision["status"] != "completed":
             raise ClaudeResponseError(stop_reason, content, "missing or invalid status")
 
-        product_id = decision.get("product_id")
-        if not isinstance(product_id, str) or not product_id.strip():
-            raise ClaudeResponseError(stop_reason, content, "completed decision missing product_id")
-
+        product_id = decision.get("product_id") if isinstance(decision.get("product_id"), str) else ""
         listing_id = decision.get("listing_id") if isinstance(decision.get("listing_id"), str) else ""
         store_id = decision.get("store_id") if isinstance(decision.get("store_id"), str) else ""
+        product_id = product_id.strip() or None
         listing_id = listing_id.strip() or None
         store_id = store_id.strip() or None
+
+        if not product_id and not listing_id:
+            raise ClaudeResponseError(stop_reason, content, "completed decision missing product_id")
+
+        # If product_id contains a colon, it was passed as a listing_id ("store_id:product_id")
+        if product_id and ":" in product_id:
+            inferred_store, bare_product = product_id.split(":", 1)
+            listing_id = listing_id or product_id
+            store_id = store_id or inferred_store
+            product_id = bare_product
+
+        # If listing_id contains no colon:
+        if listing_id and ":" not in listing_id:
+            if not product_id:
+                product_id = listing_id
+            if store_id:
+                listing_id = f"{store_id}:{product_id}"
+            else:
+                listing_id = None
+
         prior = products.get(listing_id) if listing_id else None
-        if prior is None:
+        if prior is None and product_id:
             prior = products.get(product_id)
         if prior is not None:
             listing_id = listing_id or prior.listing_id
             store_id = store_id or prior.store_id
+
+        if not product_id and listing_id and ":" in listing_id:
+            product_id = listing_id.split(":", 1)[1]
 
         if inputs.ranking_rule is None:
             try:
@@ -477,6 +537,14 @@ class Agent:
 
         # Verify Claude's chosen product against a refreshed listing; do not re-rank it.
         product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
+        if product.product.product_id:
+            product_id = product.product.product_id
+        if product.listing_id:
+            listing_id = product.listing_id
+        if product.store_id:
+            store_id = product.store_id
+        diagnostics["listing_id"] = listing_id
+        diagnostics["store_id"] = store_id
         products[product_id] = product
         if product.listing_id:
             products[product.listing_id] = product

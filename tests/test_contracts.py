@@ -96,3 +96,58 @@ def test_nl_surface_forbids_planted_clarification():
     with pytest.raises(ValidationError, match="plant"):
         from shopping_agent.contracts import TaskDefinition
         TaskDefinition.model_validate(task)
+
+
+def test_cart_selection_normalizes_cross_identifiers():
+    from shopping_agent.contracts import CartSelection
+
+    # 1. Bare product_id
+    sel1 = CartSelection(product_id="ridge-shell", quantity=1)
+    assert sel1.product_id == "ridge-shell"
+    assert sel1.listing_id is None
+    assert sel1.store_id is None
+
+    # 2. Listing ID passed in product_id field
+    sel2 = CartSelection(product_id="trailworks-direct:ridge-shell", quantity=1)
+    assert sel2.product_id == "ridge-shell"
+    assert sel2.store_id == "trailworks-direct"
+    assert sel2.listing_id == "trailworks-direct:ridge-shell"
+
+    # 3. Listing ID passed in listing_id field without product_id
+    sel3 = CartSelection(listing_id="trailworks-direct:ridge-shell", quantity=1)
+    assert sel3.product_id == "ridge-shell"
+    assert sel3.store_id == "trailworks-direct"
+    assert sel3.listing_id == "trailworks-direct:ridge-shell"
+
+    # 4. store_id and product_id without listing_id automatically forms listing_id
+    sel4 = CartSelection(store_id="summit-outfitters", product_id="ridge-shell", quantity=1)
+    assert sel4.listing_id == "summit-outfitters:ridge-shell"
+    assert sel4.product_id == "ridge-shell"
+    assert sel4.store_id == "summit-outfitters"
+
+    # 5. Missing both raises ValidationError
+    with pytest.raises(ValidationError):
+        CartSelection(quantity=1)
+
+
+def test_claude_answer_accepts_listing_id_and_normalizes():
+    from shopping_agent.contracts import ClaudeAnswer
+
+    ans1 = ClaudeAnswer.model_validate({
+        "status": "completed",
+        "listing_id": "trailworks-direct:ridge-shell",
+        "response": "Found it",
+    })
+    assert ans1.listing_id == "trailworks-direct:ridge-shell"
+    assert ans1.product_id == "ridge-shell"
+    assert ans1.store_id == "trailworks-direct"
+
+    ans2 = ClaudeAnswer.model_validate({
+        "status": "completed",
+        "product_id": "trailworks-direct:ridge-shell",
+        "response": "Found it",
+    })
+    assert ans2.listing_id == "trailworks-direct:ridge-shell"
+    assert ans2.product_id == "ridge-shell"
+    assert ans2.store_id == "trailworks-direct"
+
