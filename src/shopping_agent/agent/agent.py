@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+from dataclasses import dataclass, field
 
 import requests
 from pydantic import ValidationError
@@ -18,7 +19,12 @@ from shopping_agent.contracts import (
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
-from shopping_agent.verifier import eligible, field_value, verify_claims
+from shopping_agent.verifier import (
+    eligible,
+    field_value,
+    verification_failure_reason,
+    verify_claims,
+)
 
 TOOLS = [
     {
@@ -113,6 +119,14 @@ Use JSON booleans true/false and JSON numbers for numeric values; do not quote t
 Ask for clarification when the shopper says they are unsure a brand's sizing fits.
 An approximate capacity like ~30 liters is actionable: check the listings before
 asking a question, and choose a matching product when one exists.
+A final choice is re-verified against a refreshed listing before it is added to the
+cart. If that verification fails (for example, the price rose above your budget or
+the item went out of stock), you will receive a verification_failure observation
+with the exact reason. Treat it as a new observation: pick a different eligible,
+in-stock candidate you have already observed, or refresh one listing, and return
+another final JSON decision within your remaining tool budget. Do not repeat a
+rejected product, and do not switch to no_valid_product while another viable
+candidate remains.
 """
 
 INTERPRETATION_PROMPT = """
@@ -150,6 +164,31 @@ class ClaudeResponseError(RuntimeError):
         super().__init__(
             f"Claude final response invalid ({problem}); stop_reason={reason!r}; final_text={final_text!r}"
         )
+
+
+@dataclass
+class VerificationRejection:
+    """A completed decision whose chosen product failed the deterministic gate.
+
+    Returned by ``finish`` instead of a terminal ``AgentOutput`` so the ReAct loop can
+    feed the reason back as a fresh observation and let the model choose a runner-up.
+    """
+
+    product_id: str
+    reason: str
+    response_text: str
+    diagnostics: dict = field(default_factory=dict)
+    price: float | None = None
+    stock: int | None = None
+
+    def as_dict(self) -> dict:
+        return {
+            "product_id": self.product_id,
+            "reason": self.reason,
+            "response_text": self.response_text,
+            "observed_price": self.price,
+            "observed_stock": self.stock,
+        }
 
 
 class Agent:
@@ -207,8 +246,9 @@ class Agent:
         products = {}
         correction_used = False
         last_response_error = None
+        rejections: list[VerificationRejection] = []
 
-        for _ in range(self.max_turns):
+        for turn in range(self.max_turns):
             answer = self.ask_claude(messages)
 
             if answer.get("stop_reason") != "tool_use":
@@ -230,7 +270,31 @@ class Agent:
                         ),
                     })
                     continue
-                return self.finish(decision, answer, inputs, tools, products)
+
+                outcome = self.finish(decision, answer, inputs, tools, products)
+                if isinstance(outcome, VerificationRejection):
+                    rejections.append(outcome)
+                    if answer.get("content"):
+                        messages.append({"role": "assistant", "content": answer["content"]})
+                    messages.append({
+                        "role": "user",
+                        "content": self._verification_observation(
+                            outcome,
+                            products,
+                            rejected_ids=[item.product_id for item in rejections],
+                            turns_remaining=self.max_turns - turn - 1,
+                        ),
+                    })
+                    continue
+
+                if rejections:
+                    outcome.diagnostics["verification_rejections"] = [
+                        rejection.as_dict() for rejection in rejections
+                    ]
+                    if outcome.termination_reason == "completed":
+                        outcome.diagnostics["recovered_after_rejection"] = True
+                last_response_error = None
+                return outcome
 
             tool_results = []
             for block in answer["content"]:
@@ -263,9 +327,64 @@ class Agent:
             messages.append({"role": "assistant", "content": answer["content"]})
             messages.append({"role": "user", "content": tool_results})
 
+        if rejections:
+            # The gate rejected every proposed product and no turn remains to retry.
+            last = rejections[-1]
+            diagnostics = dict(last.diagnostics)
+            diagnostics["verification_rejections"] = [
+                rejection.as_dict() for rejection in rejections
+            ]
+            diagnostics["recovery_exhausted"] = True
+            return AgentOutput(
+                response_text=(
+                    "The selected product failed final verification after a catalog change, "
+                    "and no alternative was confirmed within the remaining tool budget."
+                ),
+                termination_reason="no_valid_product",
+                diagnostics=diagnostics,
+            )
+
         if last_response_error is not None:
             raise last_response_error
         raise RuntimeError("Claude used too many turns")
+
+    @staticmethod
+    def _verification_observation(
+        rejection: VerificationRejection,
+        products: dict,
+        rejected_ids: list[str],
+        turns_remaining: int,
+    ) -> str:
+        """Render a gate rejection as a tool-like observation for the next ReAct turn."""
+        candidates = []
+        seen = set()
+        for observation in products.values():
+            key = (observation.store_id, observation.product.product_id)
+            if key in seen or observation.product.product_id == rejection.product_id:
+                continue
+            seen.add(key)
+            candidates.append({
+                "product_id": observation.product.product_id,
+                "listing_id": observation.listing_id,
+                "store_id": observation.store_id,
+            })
+
+        return json.dumps({
+            "type": "verification_failure",
+            "message": (
+                "Your proposed product failed final verification against the current "
+                "listing and was NOT added to the cart. Pick a different eligible, "
+                "in-stock candidate from the observed set, or refresh one listing, "
+                "then return a new final JSON decision."
+            ),
+            "rejected_product_id": rejection.product_id,
+            "reason": rejection.reason,
+            "observed_price": rejection.price,
+            "observed_stock": rejection.stock,
+            "rejected_product_ids": rejected_ids,
+            "observed_candidates": candidates,
+            "turns_remaining": turns_remaining,
+        })
 
     def ask_claude(self, messages):
         return self._post_messages(system=PROMPT, messages=messages, tools=TOOLS)
@@ -536,7 +655,21 @@ class Agent:
         diagnostics["store_id"] = store_id
 
         # Verify Claude's chosen product against a refreshed listing; do not re-rank it.
-        product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
+        try:
+            product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
+        except ToolError as exc:
+            if exc.status_code != 404:
+                raise
+            diagnostics["verification_rejection"] = {
+                "product_id": product_id,
+                "reason": f"{product_id} is no longer listed (HTTP 404)",
+            }
+            return VerificationRejection(
+                product_id=product_id,
+                reason=diagnostics["verification_rejection"]["reason"],
+                response_text=response_text,
+                diagnostics=diagnostics,
+            )
         if product.product.product_id:
             product_id = product.product.product_id
         if product.listing_id:
@@ -555,10 +688,20 @@ class Agent:
         )
 
         if product.product.stock < 1 or not eligible(product, constraints):
-            return AgentOutput(
+            reason = verification_failure_reason(product, constraints)
+            diagnostics["verification_rejection"] = {
+                "product_id": product_id,
+                "reason": reason,
+            }
+            # Feed the failure back to the ReAct loop instead of terminating; the
+            # model may choose a runner-up within its remaining tool budget.
+            return VerificationRejection(
+                product_id=product_id,
+                reason=reason,
                 response_text=response_text,
-                termination_reason="no_valid_product",
                 diagnostics=diagnostics,
+                price=product.product.price,
+                stock=product.product.stock,
             )
 
         cart = tools.inspect_cart()

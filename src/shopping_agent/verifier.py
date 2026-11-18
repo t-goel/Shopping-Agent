@@ -48,6 +48,37 @@ def eligible(observation: ProductObservation, constraints: list[Constraint]) -> 
     )
 
 
+def verification_failure_reason(
+    observation: ProductObservation, constraints: list[Constraint]
+) -> str:
+    """Explain, in observation form, why a refreshed product failed the gate.
+
+    Names each failed hard constraint (or stock requirement) and the value that was
+    actually observed, so an agent can feed the reason back into its ReAct loop and
+    pick a different candidate. Unknown fields are reported as failures because the
+    gate does not relax a hard constraint it cannot verify.
+    """
+    product = observation.product
+    problems = []
+
+    if product.stock < 1:
+        problems.append(f"stock is {product.stock} (at least 1 required)")
+
+    for check in check_constraints(observation, constraints):
+        if check.status == "pass":
+            continue
+        constraint = check.constraint
+        observed = field_value(observation, constraint.attribute)
+        problems.append(
+            f"{constraint.attribute} {constraint.operator} {constraint.value!r} "
+            f"{check.status} (observed {observed!r})"
+        )
+
+    if not problems:
+        return f"{product.product_id} is no longer eligible"
+    return "; ".join(problems)
+
+
 def verify_claims(observation: ProductObservation, claims: list[Claim]) -> list[EvidenceItem]:
     evidence = []
 
