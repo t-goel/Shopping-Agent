@@ -17,8 +17,13 @@
       },
       {
         "attribute": "capacity_liters",
-        "operator": "eq",
-        "value": 30
+        "operator": "gte",
+        "value": 25
+      },
+      {
+        "attribute": "capacity_liters",
+        "operator": "lte",
+        "value": 35
       },
       {
         "attribute": "price",

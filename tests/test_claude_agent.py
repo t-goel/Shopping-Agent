@@ -176,9 +176,10 @@ def test_model_budget_omission_is_not_silently_injected():
       "ranking_rule":"lowest_price"}'''
     result = run_trial(catalog, tasks["implied_monsoon_kit_single_sku"],
                        agent=ScriptedClaude([search("bags"), final(decision)]))
-    # Without injecting the omitted budget, Claude's pick stands and scoring fails.
-    assert result.selected_product_ids == ["headwater-duffel"]
-    assert result.response_text == "Choose it"
+    # With query interpreter routing on NL tasks, the extracted budget ($70) is enforced at verification;
+    # Claude's over-budget pick fails verification rather than being placed in the cart.
+    assert result.selected_product_ids == []
+    assert result.termination_reason == "no_valid_product"
     assert not result.is_successful
 
 
