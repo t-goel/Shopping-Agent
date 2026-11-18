@@ -28,6 +28,13 @@ explicit clarification request instead of a guessed search.
   evidence remain available. `runAgent` now interprets free-form input with
   Claude before shopping; inputs such as “least expensive rain shell, medium
   size, below $100” are converted into typed constraints before tool use.
+- **Dynamic recovery:** The verification gate is now connected back to the ReAct
+  loop. When a mid-trial price hike or stock drop makes Claude's completed choice
+  ineligible, the gate returns a `verification_failure` observation with the
+  failed constraint, the value actually observed, and the remaining turn budget.
+  Claude can pick an already-observed runner-up and re-verify it within the same
+  tool budget instead of terminating. If no alternative survives, the trial ends
+  as `no_valid_product` with the full rejection history in diagnostics.
 - **Evaluation:** The new parser and contract tests pass (14/14). Existing
   agent, parser, contract, and evaluation tests pass (38/38 when excluding one
   HTTP-client compatibility failure described below). The current pilot
@@ -56,6 +63,29 @@ HTTP client raised an exception from a different imported HTTPX module than
 the class caught by `CatalogAPI`. Focused parser, contract, and evaluation
 behavior passed; the dependency/import mismatch should be resolved before
 reporting a clean full-suite result.
+
+### Paper text: verification gate recovery
+
+The draft paper *A Constraint-Verified Shopping Agent Under Dynamic Catalog
+Changes* described the deterministic verification gate as terminal. Its
+Figure 1 flow ended at “no valid product” once the gate rejected a choice, and
+Section 3.2.5 stated that after a mid-trial price hike or stock drop the LLM
+agent simply terminates, while only the rules baseline refreshed and re-ranked
+backup items. That limitation is now resolved, and the paper text should reflect
+the implemented behavior.
+
+`finish()` no longer converts a gate rejection into a terminal answer. It returns
+a `VerificationRejection` carrying the rejected product, the reason (for example
+`price lte 120.0 fail (observed 130.0)` or `stock is 0 (at least 1 required)`),
+and the refreshed observation. The ReAct loop appends that reason as a
+`verification_failure` observation — alongside the already-observed candidates
+and the turns remaining — and calls Claude again. The model, not the gate,
+chooses the runner-up and re-verifies it on the next final decision. A purchase
+is only attempted after the refreshed listing passes; repeated rejections that
+exhaust the tool budget end as `no_valid_product` with the rejection history
+recorded in diagnostics. Figure 1 should show this recovery edge from the
+verification node back to the ReAct loop, and Section 3.2.5 should describe the
+recovery trace rather than the former terminating behavior.
 
 ## 4. Next Steps
 
@@ -117,8 +147,10 @@ reporting a clean full-suite result.
   into validated hard constraints, soft preferences, ranking rules, and
   clarification questions before the shopping loop. Strengthened stale-data
   handling by refreshing and re-ranking candidates immediately before cart
-  insertion, added recoverable tool-error responses, and wrote regression tests
-  for malformed model output and request interpretation.
+  insertion, connected verification failures back to the ReAct loop as
+  observations so the agent can pick a runner-up within its tool budget, added
+  recoverable tool-error responses, and wrote regression tests for malformed
+  model output, request interpretation, and price-hike/stock-drop recovery.
 - **Tim:** [Confirm this week's Playwright/browser-use work.]
 - **Neel:** [Confirm this week's mock-store/catalog work.]
 - **Billy:** [Confirm this week's evaluation-runner, scoring, or reporting work.]

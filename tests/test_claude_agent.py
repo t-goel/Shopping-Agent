@@ -27,18 +27,40 @@ def test_agent_rejects_non_json_model_output():
         Agent(api_key="test").read_answer([{"type": "text", "text": "not json"}])
 """Provider-free checks of Claude's final-decision boundary."""
 
+import json
+
 from server.state import load_examples
 from shopping_agent.agent.agent import Agent
+from shopping_agent.contracts import Mutation
 from shopping_agent.eval.runner import run_trial
 
 
 class ScriptedClaude(Agent):
-    def __init__(self, answers):
-        super().__init__(api_key="test-key")
+    def __init__(self, answers, max_turns=10):
+        super().__init__(api_key="test-key", max_turns=max_turns)
         self.answers = iter(answers)
+        self.messages_seen = []
 
     def ask_claude(self, messages):
+        self.messages_seen.append(json.loads(json.dumps(messages)))
         return next(self.answers)
+
+
+def verification_observation(messages_seen):
+    """Return the most recent verification_failure observation sent into the loop."""
+    found = None
+    for messages in messages_seen:
+        for message in messages:
+            content = message.get("content")
+            if not isinstance(content, str) or not content.startswith("{"):
+                continue
+            try:
+                payload = json.loads(content)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict) and payload.get("type") == "verification_failure":
+                found = payload
+    return found
 
 
 def final(text, reason="end_turn"):
@@ -99,6 +121,7 @@ def test_price_hike_keeps_claude_pick_when_still_valid():
 
 
 def test_wrong_completed_pick_is_not_replaced_by_re_rank():
+    """The gate reports the failure; it never silently substitutes a runner-up."""
     catalog, tasks = load_examples()
     decision = '''{"status":"completed","product_id":"city-windbreaker",
       "response":"Choose the windbreaker.",
@@ -107,12 +130,26 @@ def test_wrong_completed_pick_is_not_replaced_by_re_rank():
                      {"attribute":"size","operator":"eq","value":"M"},
                      {"attribute":"price","operator":"lte","value":120}],
       "ranking_rule":"lowest_price","claims":[]}'''
-    result = run_trial(catalog, tasks["price_hike_recover_to_alternative"],
-                       agent=ScriptedClaude([search("jackets"), final(decision)]))
+    abstain = '''{"status":"no_valid_product","product_id":"",
+      "response":"No eligible replacement.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"jackets"},
+                     {"attribute":"waterproof","operator":"eq","value":true},
+                     {"attribute":"size","operator":"eq","value":"M"},
+                     {"attribute":"price","operator":"lte","value":120}],
+      "ranking_rule":"lowest_price","claims":[]}'''
+    agent = ScriptedClaude([search("jackets"), final(decision), final(abstain)])
+    result = run_trial(catalog, tasks["price_hike_recover_to_alternative"], agent=agent)
     assert not result.is_successful
     assert result.termination_reason == "no_valid_product"
     assert result.selected_product_ids == []
-    assert result.response_text == "Choose the windbreaker."
+    assert not result.cart_items
+    assert result.response_text == "No eligible replacement."
+    observation = verification_observation(agent.messages_seen)
+    assert observation["rejected_product_id"] == "city-windbreaker"
+    assert "waterproof" in observation["reason"]
+    rejection = result.agent_diagnostics["verification_rejections"][0]
+    assert rejection["product_id"] == "city-windbreaker"
+    assert "recovered_after_rejection" not in result.agent_diagnostics
 
 
 def test_false_abstention_is_honored_not_overridden():
@@ -245,3 +282,96 @@ def test_multi_store_claude_search_requires_store_id_and_carts_listing():
     assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
     assert result.tool_trace[0]["name"] == "list_stores"
     assert result.tool_trace[1]["inputs"]["store_id"] == "trailworks-direct"
+
+
+JACKET_CONSTRAINTS = [
+    {"attribute": "category", "operator": "eq", "value": "jackets"},
+    {"attribute": "waterproof", "operator": "eq", "value": True},
+    {"attribute": "size", "operator": "eq", "value": "M"},
+    {"attribute": "price", "operator": "lte", "value": 120},
+]
+
+
+def jacket_decision(product_id, response, price):
+    return json.dumps({
+        "status": "completed",
+        "product_id": product_id,
+        "response": response,
+        "constraints": JACKET_CONSTRAINTS,
+        "ranking_rule": "lowest_price",
+        "claims": [{"field": "price", "value": price}],
+    })
+
+
+def test_price_hike_rejection_feeds_back_and_agent_recovers_within_budget():
+    catalog, tasks = load_examples()
+    stale = jacket_decision("ridge-shell", "Ridge Shell is under budget.", 89)
+    runner_up = jacket_decision(
+        "summit-shell", "Summit Shell is cheapest after the price change.", 96,
+    )
+    agent = ScriptedClaude([search("jackets"), final(stale), final(runner_up)])
+    result = run_trial(catalog, tasks["price_hike_recover_to_alternative"], agent=agent)
+
+    assert result.is_successful, result.model_dump()
+    assert result.termination_reason == "completed"
+    assert result.selected_product_ids == ["summit-shell"]
+    assert result.response_text.startswith("Summit Shell")
+    assert result.cart_items[0].product_id == "summit-shell"
+
+    observation = verification_observation(agent.messages_seen)
+    assert observation["rejected_product_id"] == "ridge-shell"
+    assert "price" in observation["reason"] and "120" in observation["reason"]
+    assert observation["observed_price"] == 130.0
+    assert observation["observed_stock"] > 0
+    assert any(row["product_id"] == "summit-shell" for row in observation["observed_candidates"])
+    assert observation["turns_remaining"] == 8
+
+    diagnostics = result.agent_diagnostics
+    assert diagnostics["recovered_after_rejection"] is True
+    assert len(diagnostics["verification_rejections"]) == 1
+    assert diagnostics["verification_rejections"][0]["product_id"] == "ridge-shell"
+    assert result.tool_calls <= 20  # recovery stayed inside the public tool budget
+
+
+def test_stock_drop_rejection_feeds_back_and_agent_recovers_within_budget():
+    catalog, tasks = load_examples()
+    task = tasks["price_hike_recover_to_alternative"].model_copy(deep=True)
+    task.mutations = [Mutation(after_observations=1, product_id="ridge-shell", stock=0)]
+
+    stale = jacket_decision("ridge-shell", "Ridge Shell is in stock.", 89)
+    runner_up = jacket_decision(
+        "summit-shell", "Summit Shell is still available.", 96,
+    )
+    agent = ScriptedClaude([search("jackets"), final(stale), final(runner_up)])
+    result = run_trial(catalog, task, agent=agent)
+
+    assert result.is_successful, result.model_dump()
+    assert result.selected_product_ids == ["summit-shell"]
+    assert result.cart_items[0].product_id == "summit-shell"
+
+    observation = verification_observation(agent.messages_seen)
+    assert observation["rejected_product_id"] == "ridge-shell"
+    assert "stock is 0" in observation["reason"]
+    assert observation["observed_stock"] == 0
+    assert result.agent_diagnostics["recovered_after_rejection"] is True
+    assert result.tool_calls <= 20
+
+
+def test_repeated_gate_rejections_exhaust_budget_and_abstain():
+    catalog, tasks = load_examples()
+    stale = jacket_decision("ridge-shell", "Ridge Shell is under budget.", 89)
+    agent = ScriptedClaude([search("jackets"), final(stale), final(stale)], max_turns=3)
+    result = run_trial(catalog, tasks["price_hike_recover_to_alternative"], agent=agent)
+
+    assert not result.is_successful
+    assert result.termination_reason == "no_valid_product"
+    assert result.selected_product_ids == []
+    assert not result.cart_items
+    assert result.agent_diagnostics["recovery_exhausted"] is True
+    assert len(result.agent_diagnostics["verification_rejections"]) == 2
+    assert "verification" in result.response_text
+    assert not result.agent_diagnostics.get("recovered_after_rejection")
+
+    observation = verification_observation(agent.messages_seen)
+    assert observation["rejected_product_id"] == "ridge-shell"
+    assert observation["turns_remaining"] == 1

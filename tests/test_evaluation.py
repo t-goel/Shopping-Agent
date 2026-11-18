@@ -16,7 +16,11 @@ from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim
 from shopping_agent.tools.api import CatalogAPI, ToolError
 from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded
-from shopping_agent.verifier import check_constraints, verify_claims
+from shopping_agent.verifier import (
+    check_constraints,
+    verification_failure_reason,
+    verify_claims,
+)
 
 HARNESS = Path(__file__).resolve().parents[1] / "data" / "tasks" / "harness"
 
@@ -48,6 +52,22 @@ def test_verifier_boundary_missing_boolean_and_claims():
     assert all(e.source_url == obs.source_url and e.observed_at == obs.observed_at for e in evidence)
     with pytest.raises(ValueError, match="IDs"):
         verify_claims(obs, [claims[0].model_copy(update={"product_id": "wrong"})])
+
+
+def test_verification_failure_reason_names_failed_field_and_observed_value():
+    catalog, _ = load_examples()
+    obs = observation(catalog.products[0])  # ridge-shell: $89, waterproof, in stock
+
+    reason = verification_failure_reason(obs, [
+        Constraint(attribute="price", operator="lte", value=80),
+        Constraint(attribute="waterproof", operator="eq", value=True),
+    ])
+    assert "price" in reason and "fail" in reason and "89.0" in reason
+    assert "waterproof" not in reason
+
+    out_of_stock = obs.model_copy(deep=True)
+    out_of_stock.product.stock = 0
+    assert "stock is 0" in verification_failure_reason(out_of_stock, [])
 
 
 def test_ranking_ties_ratings_and_no_reviews():
