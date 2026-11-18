@@ -146,7 +146,7 @@ class Agent:
         self.output_tokens = None
         self._missing_usage = set()
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
+        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
         self.effort = effort or os.environ.get("ANTHROPIC_EFFORT", "high")
         self.max_turns = max_turns
         self.url = "https://api.anthropic.com/v1/messages"
@@ -272,7 +272,7 @@ class Agent:
         }
         payload = {
             "model": self.model,
-            # Thinking counts toward max_tokens on Haiku 5.5; leave room at high effort.
+            # Thinking counts toward max_tokens at high effort; leave room for the final answer.
             "max_tokens": 8192,
             "system": system,
             "tools": tools,

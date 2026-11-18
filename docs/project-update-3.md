@@ -19,10 +19,10 @@ explicit clarification request instead of a guessed search.
 
 ## 2. Current Status
 
-- **Benchmark:** The existing five authored tasks and six-product catalog remain
-  functional. The next benchmark milestone is to add distinct store/catalog
-  configurations and harder tasks that test distractors, ranking tradeoffs,
-  ambiguity, and browser interaction.
+- **Benchmark:** The ten authored tasks (3 easy / 3 medium / 4 hard) and the
+  20-product catalog remain functional. The next benchmark milestone is to add
+  distinct store/catalog configurations and harder tasks that test distractors,
+  ranking tradeoffs, ambiguity, and browser interaction.
 - **Agent:** The typed rules baseline, Claude interpretation call, Claude tool
   loop, listing refresh, eligibility verification, cart verification, and claim
   evidence remain available. `runAgent` now interprets free-form input with

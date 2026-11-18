@@ -32,7 +32,7 @@ Search observations become stale when prices or stock mutate. The baseline re-re
 
 Agents receive the parsed request, ranking rule, and allowlisted tools. Expected sets, task mutations, reset, and state snapshots remain evaluator controls. The supplied clarification directive is an intentional pilot shortcut, so these results do not claim unassisted ambiguity detection. Ordinary tools operate through the existing FastAPI routes, rather than directly reading store state.
 
-We distinguish stopping rules from quality targets: trials have 10 attempted public tool calls and a 60-second execution limit; 15-second latency remains a performance target. A parent process can terminate a blocked agent. Errors and timeouts are unsuccessful and stay in the success-rate denominator. The installed Starlette version emits an HTTPX deprecation warning; current tests and trials pass, with exact dependency versions preserved for reproduction.
+We distinguish stopping rules from quality targets: trials have 20 attempted public tool calls and a 60-second execution limit; 15-second latency remains a performance target. A parent process can terminate a blocked agent. Errors and timeouts are unsuccessful and stay in the success-rate denominator. The installed Starlette version emits an HTTPX deprecation warning; current tests and trials pass, with exact dependency versions preserved for reproduction.
 
 ## 4. Next Steps
 

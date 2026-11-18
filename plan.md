@@ -12,7 +12,7 @@ Use these terms consistently in code, task definitions, and papers:
 
 - **Contract:** A typed definition of the data a module accepts and returns, including validation rules and failure cases.
 - **Example:** A versioned product catalog, shopping request, or task definition used to seed a mock-store run. Prefer "example" or "task definition" over "fixture."
-- **Tool:** A named action the agent can request, such as `search_site` or `get_listing_details`. The tool implementation performs the bounded operation and returns an observation.
+- **Tool:** A named action the agent can request, such as `search_site` or `get_listing`. The tool implementation performs the bounded operation and returns an observation.
 - **Observation:** Data the tool actually saw, including source URL and time. Missing information stays unknown.
 - **Evidence:** A stored link between a product claim and the observation that supports, contradicts, or cannot verify it.
 - **Trial:** One agent/baseline run on one task definition with a known initial store state.
@@ -26,7 +26,7 @@ Use `product example`, `request example`, and `task definition` in prose; keep f
 - **Packaging and commands:** Use `requirements.txt` for a straightforward pip install and `run.py` as the default local launcher; it starts the mock API and storefront and opens the browser. Keep optional development dependencies in `requirements-dev.txt`.
 - **Schemas:** Pydantic models for requests, products, tool inputs/outputs, tasks, and trial records. A sample schema is shown below.
 - **Mock store:** A FastAPI backend and a small React/Vite storefront, kept in `mock-store/` with its own dependency files and commands. Begin with versioned JSON examples loaded into in-memory state, not a database.
-- **Agent and model access:** Use the Anthropic API with Claude Haiku 5.5 for the initial agent. Keep the model behind a small provider interface and make model ID, prompts, and limits configurable for future comparisons.
+- **Agent and model access:** Use the Anthropic API with Claude Sonnet 4.5 (`claude-sonnet-4-5`) for the initial agent. Keep the model behind a small provider interface and make model ID, prompts, and limits configurable for future comparisons.
 - **Browser interaction:** Use Playwright's Python library directly for browser startup, navigation, screenshots, clicks, typing, scrolling, and page observations. Write our own agent loop and tool orchestration; do not use an existing full agent framework. The browser tool layer translates bounded agent actions into Playwright actions and returns observations.
 - **Tests:** `pytest`, including unit tests for constraint and score logic, API tests for store behavior, and end-to-end tests for a few benchmark tasks.
 - **Logging and results:** Structured JSONL trial records and ordinary Python logging. Record prompt/model versions and task/example versions so runs can be reproduced.
@@ -222,7 +222,7 @@ Do not log API keys. Keep credentials in environment variables, and make a full 
 
 1. **Foundation:** Agree on contracts, terminology, and scoring rules; create versioned product/task examples and the resettable mock store.
 2. **Baseline:** Implement deterministic tools, verifier, and rules-based benchmark runner.
-3. **Agent:** Add the Anthropic/Claude Haiku 5.5 request parser and planner, bounded API tool loop, verifier, recommendation output, and standard ReAct baseline.
+3. **Agent:** Add the Anthropic/Claude Sonnet 4.5 request parser and planner, bounded API tool loop, verifier, recommendation output, and standard ReAct baseline.
 4. **API evaluation:** Add remaining baselines and ablations, run the API task suite, and inspect per-task failures.
 5. **Browser evaluation:** Add Playwright browser tools and run the same tasks through the mock storefront. Confirm no API shortcuts are used in this condition.
 6. **Real-site exploration:** Implement and smoke-test site adapters on permitted real sites before relying on them. Test read-only navigation, log failures separately, and investigate self-healing site tools or purchase protocols after the core benchmark is reproducible.

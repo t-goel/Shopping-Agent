@@ -22,9 +22,9 @@ The runner currently names the built-in condition `rules`, has no model measurem
 
 ## Teammate 2: benchmark
 
-Own `data/tasks` and the mock catalog. Add five original tasks to reach 10, with a final 3 easy / 3 medium / 4 hard split. Current split is 1 easy / 2 medium / 2 hard. Include highest-rating tradeoffs, ties, and mutation recovery with valid replacements. Broaden beyond jackets and avoid tasks differing only in superficial wording.
+Own `data/tasks` and the mock catalog. The suite now has 10 original tasks with a 3 easy / 3 medium / 4 hard split, expanded from the five-task pilot's 1 easy / 2 medium / 2 hard. The tasks include highest-rating tradeoffs, ties, and mutation recovery with valid replacements, and broaden beyond jackets.
 
-The authoring loader validates references and declared expected sets. Independently review task goals and constraints; do not use the baseline's output to decide the answer. Existing test-only replacement catalogs demonstrate recovery without consuming your task ownership. Update any existing tests that explicitly enumerate the five tasks when expanding the suite.
+The authoring loader validates references and declared expected sets. Independently review task goals and constraints; do not use the baseline's output to decide the answer. Existing test-only replacement catalogs demonstrate recovery without consuming your task ownership. Existing tests that enumerate the tasks are kept in sync with the ten-task suite.
 
 The pilot uses category-wide search limited to 50 results and fails on a possibly truncated result set. It re-reads all results and revalidates the chosen item before cart addition. Large catalogs, missing category constraints, category changes, and arbitrary late events may need additional search/replanning support. Keep tasks within the documented interface or propose contract changes first.
 
@@ -45,4 +45,4 @@ Collect everyone's verified contribution statements and replace the pending entr
 
 Define validated/inconclusive/negative precedence and the missing 5–15 percentage-point region before examining comparative results. Resolve the document's three-repeat vs five-repeat consistency procedures. Use agreement on selected IDs, including explicit no-match/clarification outcomes, rather than variance of arbitrary product-ID encodings.
 
-Define claim units, supported/contradicted/unknown labels, denominators, paraphrase review, and an anchored human scoring rubric. Independently annotate explanation text; verifier-produced evidence alone is not an unsupported-claim audit. Predefine paired statistical analysis at the task level, avoiding treatment of repeated trials on the same task as independent tasks. Document failure accounting and stopping budgets. Tomorrow's five-task results are exploratory and support no comparative significance claim.
+Define claim units, supported/contradicted/unknown labels, denominators, paraphrase review, and an anchored human scoring rubric. Independently annotate explanation text; verifier-produced evidence alone is not an unsupported-claim audit. Predefine paired statistical analysis at the task level, avoiding treatment of repeated trials on the same task as independent tasks. Document failure accounting and stopping budgets. The five-task pilot results are exploratory and support no comparative significance claim.

@@ -73,4 +73,7 @@ and [reviewed pilot records](docs/pilot/rules-2026-10-12-reviewed.jsonl).
 
 A visually checked [Update 2 PDF draft](output/pdf/project-update-2-draft.pdf) is included.
 It remains a draft until the team supplies all four names and actual contribution statements.
+The PDF is a frozen Update 2 artifact; for the current model ID, tool-call budget, task count,
+and difficulty split, use the markdown sources and `docs/benchmark/task-summary.json` as the
+authoritative record.
 The original pilot records are retained alongside the rerun after the reviewer fixes.
