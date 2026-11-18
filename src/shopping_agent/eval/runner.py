@@ -13,6 +13,7 @@ from pathlib import Path
 from time import monotonic
 
 from shopping_agent.agent.agent import Agent as ClaudeAgent
+from shopping_agent.agent.baselines import CONDITIONS, OfflineAgent
 from shopping_agent.agent.rules import RulesAgent
 from shopping_agent.contracts import (
     CartSelection,
@@ -66,7 +67,7 @@ def agent_metadata(agent):
     }
 
 
-def metadata(max_calls: int, seconds: float) -> dict:
+def metadata(max_calls: int, seconds: float, agent_name: str = "rules") -> dict:
     source = hashlib.sha256()
     for path in sorted((ROOT / "src").rglob("*.py")):
         source.update(str(path.relative_to(ROOT)).encode())
@@ -81,7 +82,7 @@ def metadata(max_calls: int, seconds: float) -> dict:
         "git_commit": commit,
         "source_sha256": source.hexdigest(),
         "runner": "evaluation",
-        "baseline": "rules",
+        "baseline": agent_name,
         "max_tool_calls": max_calls,
         "timeout_seconds": seconds,
         "python": platform.python_version(),
@@ -94,12 +95,16 @@ def select_agent(agent=None, agent_name: str = "rules"):
     if agent is not None:
         if isinstance(agent, RulesAgent):
             return agent, "rules"
+        if isinstance(agent, OfflineAgent):
+            return agent, agent.condition
         return agent, "claude" if isinstance(agent, ClaudeAgent) else type(agent).__name__
     if agent_name == "claude":
         return ClaudeAgent(), "claude"
     if agent_name == "rules":
         return RulesAgent(), "rules"
-    raise ValueError("agent_name must be rules or claude")
+    if agent_name in CONDITIONS:
+        return OfflineAgent(agent_name), agent_name
+    raise ValueError(f"agent_name must be rules, claude, or one of: {', '.join(CONDITIONS)}")
 
 
 def claude_credentials_available(agent=None) -> bool:
@@ -169,8 +174,8 @@ def run_trial(
     from starlette.testclient import TestClient
 
     create_app, store = _build_store(catalog, task)
-    config = metadata(max_calls, seconds)
     selected_agent, agent_name = validate_experiment(task=task, agent=agent)
+    config = metadata(max_calls, seconds, agent_name)
     config["agent"] = agent_metadata(selected_agent)
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
@@ -270,14 +275,14 @@ def isolated_trial(
     if max_calls < 1 or seconds <= 0:
         raise ValueError("budgets must be positive")
 
-    selected_agent, _ = validate_experiment(task=task, agent=agent)
+    selected_agent, selected_name = validate_experiment(task=task, agent=agent)
     context = multiprocessing.get_context("spawn")
     receive, send = context.Pipe(duplex=False)
     process = context.Process(
         target=_worker,
         args=(send, catalog, task, trial_number, max_calls, seconds, selected_agent),
     )
-    config = metadata(max_calls, seconds)
+    config = metadata(max_calls, seconds, selected_name)
     config["agent"] = agent_metadata(selected_agent)
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
@@ -360,26 +365,37 @@ def run_suite(
     max_calls: int = 20,
     seconds: float = 60,
     agent_name: str = "rules",
+    seeds: list[int] | None = None,
     on_result=None,
 ) -> list[TrialResult]:
-    if repetitions < 1:
-        raise ValueError("repetitions must be positive")
+    if seeds is None:
+        if repetitions < 1:
+            raise ValueError("repetitions must be positive")
+        seeds = [seed] * repetitions
+    elif not seeds:
+        raise ValueError("seeds must not be empty")
 
     validate_experiment(tasks=tasks, agent_name=agent_name)
     output.parent.mkdir(parents=True, exist_ok=True)
-    rng = random.Random(seed)
     results: list[TrialResult] = []
 
     # Refuse to overwrite previous experiments silently.
     with output.open("x", encoding="utf-8") as stream:
-        for repetition in range(1, repetitions + 1):
+        for trial_number, trial_seed in enumerate(seeds, start=1):
+            rng = random.Random(trial_seed)
             order = sorted(tasks)
             rng.shuffle(order)
 
             for position, task_id in enumerate(order):
                 agent, _ = select_agent(agent_name=agent_name)
-                result = isolated_trial(catalog, tasks[task_id], repetition, max_calls, seconds, agent)
-                result.run_metadata.update(seed=seed, task_order=order, task_position=position)
+                result = isolated_trial(catalog, tasks[task_id], trial_number, max_calls, seconds, agent)
+                result.run_metadata.update(
+                    seed=trial_seed,
+                    seeds=list(seeds),
+                    trial_number=trial_number,
+                    task_order=order,
+                    task_position=position,
+                )
                 stream.write(result.model_dump_json() + "\n")
                 stream.flush()
                 results.append(result)

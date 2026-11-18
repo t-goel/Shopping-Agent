@@ -1,0 +1,5 @@
+"Condition","Successful / trials","Success rate","Median calls","Median seconds","p95 seconds","Trials with claim evidence"
+Single-prompt LLM,0/30,0.0%,3.0,0.008364950001123361,0.01096089999191463,0/30
+Vanilla ReAct,3/30,10.0%,9.0,0.017670249995717313,0.02296280000882689,0/30
+Proposed agent (no-verifier ablation),30/30,100.0%,9.0,0.01830389999668114,0.02269059998798184,0/30
+Proposed agent (with verification gate),30/30,100.0%,11.0,0.02033770000707591,0.02579850000620354,21/30

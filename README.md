@@ -68,6 +68,25 @@ bounds worker setup/execution and a 60-second startup allowance bounds initializ
 A forcibly stopped worker has no final-state snapshot and is always unsuccessful.
 Human ratings, claim-audit rates, and model measurements remain null when unavailable.
 
+### Baseline comparison on the natural-language suite
+
+The ten natural-language tasks can be run under four conditions with three
+seeds each (30 trials per condition). `single_prompt`, `react`, `no_verifier`,
+and `full` are deterministic offline surrogates; `claude` is the live
+provider-backed agent and needs `ANTHROPIC_API_KEY`. `--seeds` accepts a
+comma-separated list and overrides `--seed`/`--repetitions` for a run.
+
+```sh
+PYTHONPATH=src python -m shopping_agent.cli compare \
+  --output-dir results/comparison-update4 --mode flat --seeds 1,2,3 \
+  --conditions single_prompt,react,no_verifier,full
+```
+
+The command writes per-condition JSONL, `comparison.json`, `comparison.csv`,
+and `table1.md`. The executed comparison and its caveats are in
+[NL suite comparison](docs/pilot/nl-comparison-update-4.md). Conditions are
+never pooled in a single report: each has its own model/prompt identity.
+
 See [parallel handoff](docs/parallel-handoff.md), [Update 2 draft](docs/project-update-2.md),
 and [reviewed pilot records](docs/pilot/rules-2026-10-12-reviewed.jsonl).
 

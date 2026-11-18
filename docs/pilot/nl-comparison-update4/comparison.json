@@ -1,0 +1,121 @@
+{
+  "conditions": {
+    "single_prompt": {
+      "condition": "single_prompt",
+      "label": "Single-prompt LLM",
+      "agent_name": "single_prompt",
+      "model_id": "offline-surrogate-v1",
+      "prompt_id": "c9f33e3d59a7a2bc64933b2b41c5d0f920ef78ac47784a12dbee8c0f2cfd0202",
+      "agent_surface": "nl",
+      "trials": 30,
+      "successful": 0,
+      "success_rate": 0.0,
+      "median_tool_calls": 3.0,
+      "median_duration_seconds": 0.008364950001123361,
+      "p95_duration_seconds": 0.01096089999191463,
+      "evidence_trials": 0,
+      "failure_categories": {
+        "selection_or_cart_mismatch": 6,
+        "hard_constraint_violation": 21,
+        "clarification_mismatch": 3
+      },
+      "termination_reasons": {
+        "completed": 30
+      }
+    },
+    "react": {
+      "condition": "react",
+      "label": "Vanilla ReAct",
+      "agent_name": "react",
+      "model_id": "offline-surrogate-v1",
+      "prompt_id": "6b625890aa1dba2bc3f6ec578b460c2509ca459b6d98863047501eb233445ada",
+      "agent_surface": "nl",
+      "trials": 30,
+      "successful": 3,
+      "success_rate": 0.1,
+      "median_tool_calls": 9.0,
+      "median_duration_seconds": 0.017670249995717313,
+      "p95_duration_seconds": 0.02296280000882689,
+      "evidence_trials": 0,
+      "failure_categories": {
+        "selection_or_cart_mismatch": 6,
+        "hard_constraint_violation": 18,
+        "incorrect_abstention": 3
+      },
+      "termination_reasons": {
+        "completed": 24,
+        "no_valid_product": 3,
+        "clarification_needed": 3
+      }
+    },
+    "no_verifier": {
+      "condition": "no_verifier",
+      "label": "Proposed agent (no-verifier ablation)",
+      "agent_name": "no_verifier",
+      "model_id": "offline-surrogate-v1",
+      "prompt_id": "9bc48f41b6d02878b32b20e6f518991c7aa4e92724ddc17f72485a067dc0ac18",
+      "agent_surface": "nl",
+      "trials": 30,
+      "successful": 30,
+      "success_rate": 1.0,
+      "median_tool_calls": 9.0,
+      "median_duration_seconds": 0.01830389999668114,
+      "p95_duration_seconds": 0.02269059998798184,
+      "evidence_trials": 0,
+      "failure_categories": {},
+      "termination_reasons": {
+        "no_valid_product": 6,
+        "completed": 21,
+        "clarification_needed": 3
+      }
+    },
+    "full": {
+      "condition": "full",
+      "label": "Proposed agent (with verification gate)",
+      "agent_name": "full",
+      "model_id": "offline-surrogate-v1",
+      "prompt_id": "722185344af054dda2da8107b60c173a5f2a470c6deb45041c15e76a56f1a1f1",
+      "agent_surface": "nl",
+      "trials": 30,
+      "successful": 30,
+      "success_rate": 1.0,
+      "median_tool_calls": 11.0,
+      "median_duration_seconds": 0.02033770000707591,
+      "p95_duration_seconds": 0.02579850000620354,
+      "evidence_trials": 21,
+      "failure_categories": {},
+      "termination_reasons": {
+        "no_valid_product": 6,
+        "completed": 21,
+        "clarification_needed": 3
+      }
+    }
+  },
+  "protocol": {
+    "tasks": [
+      "clarify_jacket_size_nl",
+      "implied_monsoon_kit_single_sku",
+      "mutation_then_empty",
+      "nl_cheapest_waterproof_daypack",
+      "nl_cheapest_waterproof_jacket_m",
+      "nl_size9_waterproof_shoe_by_rating",
+      "no_waterproof_jacket_under_50",
+      "prefer_comfort_but_require_waterproof_pack",
+      "price_hike_recover_to_alternative",
+      "restock_recover_to_cinder"
+    ],
+    "task_count": 10,
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "trials_per_condition": 30,
+    "max_tool_calls": 20,
+    "timeout_seconds": 60.0,
+    "source_sha256": "2fa18b9b1523bdfa6afafa66ca5d98c7eb584a438da40ac7007089a41ae439c3",
+    "git_commit": "2554ec7044e8b9fddca61063d011d756d1badf57",
+    "agent_surface": "nl",
+    "note": "Offline deterministic model surrogates; no Anthropic API key was used. A live provider-backed run uses --agent claude and is reported separately."
+  }
+}
