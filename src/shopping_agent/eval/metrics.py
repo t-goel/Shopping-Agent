@@ -49,7 +49,7 @@ FAILURE_CATEGORY_DESCRIPTIONS = {
     FailureCategory.TIMEOUT: "the trial exceeded its wall-clock budget",
     FailureCategory.MAX_TOOL_CALLS_EXCEEDED: "the trial exceeded its tool-call budget",
     FailureCategory.CLARIFICATION_MISMATCH: "the required clarification question was not asked",
-    FailureCategory.UNEXPECTED_CLARIFICATION: "the agent asked a question on a product task",
+    FailureCategory.UNEXPECTED_CLARIFICATION: "the agent asked a question where a decision was expected",
     FailureCategory.INCORRECT_ABSTENTION: "the agent abstained where a product choice was required",
     FailureCategory.ABSTENTION_MISMATCH: "abstention and selection were swapped relative to the task",
     FailureCategory.HARD_CONSTRAINT_VIOLATION: "the recorded selection violates a hard constraint",
@@ -91,23 +91,86 @@ def failure_category_legend() -> dict[str, str]:
     return {category.value: FAILURE_CATEGORY_DESCRIPTIONS[category] for category in FailureCategory}
 
 
+def listing_product_view(snapshot: dict, listing_id: str) -> Product:
+    """Project one store's listing onto the product shape.
+
+    A multi-store catalog keeps price, stock, and sponsorship on the listing, not
+    on the product, so anything comparing against what a store offered has to read
+    this view rather than the bare product row.
+    """
+    listing = snapshot["listings"][listing_id]
+    product = snapshot["products"][listing["product_id"]]
+    return Product(
+        product_id=product["product_id"],
+        title=product["title"],
+        description=product["description"],
+        category=product["category"],
+        currency=product.get("currency", "USD"),
+        seller=product["seller_default"],
+        attributes=product["attributes"],
+        reviews=product.get("reviews", []),
+        image_url=product.get("image_url"),
+        price=listing["price"],
+        stock=listing["stock"],
+        sponsored=listing.get("sponsored", False),
+    )
+
+
+def _listing_products(record: TrialResult, snapshot: dict) -> dict[str, Product]:
+    """Product views for the listing a trial carted or selected.
+
+    A bare product ID can name several stores' offers, so a claim is only checked
+    against the listing the trial itself used, or against the product's single
+    listing when it has one. Otherwise the claim stays unassessable rather than
+    being compared with a sibling store's row.
+    """
+    rows = snapshot.get("listings")
+    if not isinstance(rows, dict):
+        return {}
+    by_product: dict[str, list[str]] = {}
+    for listing_id, row in sorted(rows.items()):
+        if isinstance(row, dict) and isinstance(row.get("product_id"), str):
+            by_product.setdefault(row["product_id"], []).append(listing_id)
+    if not by_product:
+        return {}
+    used = set(record.selected_listing_ids)
+    used.update(item.listing_id for item in record.cart_items if item.listing_id)
+    products: dict[str, Product] = {}
+    for product_id, listing_ids in by_product.items():
+        chosen = [key for key in listing_ids if key in used] or (
+            listing_ids if len(listing_ids) == 1 else [])
+        if len(chosen) != 1:
+            continue
+        try:
+            products[product_id] = listing_product_view(snapshot, chosen[0])
+        except (KeyError, TypeError, ValidationError):
+            # Missing or malformed facts cannot support a claim.
+            continue
+    return products
+
+
 def final_products(record: TrialResult) -> dict[str, Product]:
-    """Authoritative products from the trial's final catalog snapshot."""
+    """Authoritative product facts from the trial's final catalog snapshot.
+
+    Single-store snapshots put price and stock on the product row. Multi-store
+    snapshots put them on each listing, so those trials are read through
+    ``_listing_products`` instead of losing every row to validation.
+    """
     products: dict[str, Product] = {}
     snapshot = record.final_state
     if not isinstance(snapshot, dict):
         return products
     rows = snapshot.get("products")
-    if not isinstance(rows, dict):
-        return products
-    for product_id, value in rows.items():
-        try:
-            product = Product.model_validate(value)
-        except (ValidationError, TypeError):
-            # Missing or malformed facts cannot support a claim.
-            continue
-        if product.product_id == product_id:
-            products[product_id] = product
+    if isinstance(rows, dict):
+        for product_id, value in rows.items():
+            try:
+                product = Product.model_validate(value)
+            except (ValidationError, TypeError):
+                # Missing or malformed facts cannot support a claim.
+                continue
+            if product.product_id == product_id:
+                products[product_id] = product
+    products.update(_listing_products(record, snapshot))
     return products
 
 
@@ -158,7 +221,11 @@ def structured_claim_summary(records: list[TrialResult]) -> dict:
 
 
 def tool_calls_by_purpose(records: list[TrialResult]) -> dict[str, int]:
-    """Split recorded tool calls into agent exploration and gate verification."""
+    """Split recorded tool calls into agent exploration and gate verification.
+
+    Records written before calls were labelled report their calls as
+    ``unspecified`` rather than being guessed into either bucket.
+    """
     counts = Counter()
     for record in records:
         for event in record.tool_trace:

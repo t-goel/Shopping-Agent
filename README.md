@@ -81,8 +81,11 @@ never appears under two names:
   gets exactly one, and the terminal `FAIL` line and `common_failure_issue` use
   the same label as the JSON summary.
 - `unsupported_claim_rate` is computed only from the claims the agent declares
-  in its final decision, checked against the final catalog state. It is null when
-  the run declares nothing checkable.
+  in its final decision, checked against the final catalog state: the listing the
+  trial carted or selected when price and stock live on the listing (multi-store),
+  and the product row otherwise. A claim whose product ID names several stores
+  and no used listing stays unassessable. The rate is null when the run declares
+  nothing checkable.
 - `prose_claim_contradiction_rate` is a separate advisory reading of the
   explanation text. Windowed matching can attach a nearby figure to the wrong
   product, so it is reported next to the structured rate and never replaces it.
@@ -102,11 +105,14 @@ already satisfied the request when the agent abstained). Each is evidence for
 triage; none of them changes scoring.
 
 On a catalog where several stores list the same product ID, a bare `product_id`
-identifies more than one listing. The gate refuses such a pick instead of silently
-taking whichever variant it saw last: it asks for the `listing_id`, records the
-candidates under `ambiguous_product_id`, and leaves both variants visible to the
-next turn. The same reasoning keys the run's observation cache by listing identity,
-so one store's price cannot be verified against another store's row.
+identifies more than one listing. Once the run has observed that product at more
+than one store, the gate refuses such a pick instead of silently taking whichever
+variant it saw last: it asks for the `listing_id`, records the candidates under
+`ambiguous_product_id`, and leaves both variants visible to the next turn. A pick
+for a product the run never observed is still resolved by the store itself, which
+falls back to the product's canonical store. The same reasoning keys the run's
+observation cache by listing identity, so one store's price cannot be verified
+against another store's row.
 
 ### Baseline comparison on the natural-language suite
 

@@ -2,7 +2,7 @@
 
 from shopping_agent.comparison import matches
 from shopping_agent.contracts import Product, TaskDefinition
-from shopping_agent.eval.metrics import TERMINAL_FAILURE_REASONS
+from shopping_agent.eval.metrics import TERMINAL_FAILURE_REASONS, listing_product_view
 from shopping_agent.example_checks import average_rating
 from shopping_agent.interfaces import AgentOutput
 
@@ -26,25 +26,6 @@ def _rank_products(candidates: list[Product], ranking_rule: str) -> list[Product
     return candidates
 
 
-def _listing_product_view(snapshot: dict, listing_id: str) -> Product:
-    listing = snapshot["listings"][listing_id]
-    product = snapshot["products"][listing["product_id"]]
-    return Product(
-        product_id=product["product_id"],
-        title=product["title"],
-        description=product["description"],
-        category=product["category"],
-        currency=product.get("currency", "USD"),
-        seller=product["seller_default"],
-        attributes=product["attributes"],
-        reviews=product.get("reviews", []),
-        image_url=product.get("image_url"),
-        price=listing["price"],
-        stock=listing["stock"],
-        sponsored=listing.get("sponsored", False),
-    )
-
-
 def _score_listings(
     task: TaskDefinition, output: AgentOutput, snapshot: dict
 ) -> tuple[bool, int, int]:
@@ -60,7 +41,7 @@ def _score_listings(
         selected_listings = [lid for lid in cart_listings if lid]
 
     views = {
-        listing_id: _listing_product_view(snapshot, listing_id)
+        listing_id: listing_product_view(snapshot, listing_id)
         for listing_id in snapshot["listings"]
     }
 

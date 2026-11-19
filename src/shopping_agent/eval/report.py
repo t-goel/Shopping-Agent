@@ -42,16 +42,17 @@ def summarize(records: list[TrialResult]):
     if len(agents) > 1 or len(concrete_surfaces) > 1:
         raise ValueError("Report one agent/model/prompt/input surface at a time; do not pool unlike conditions.")
 
-    # Prose extraction runs once per trial and is reused by every grouping below.
-    prose_audits = {id(record): audit_prose_claims(record) for record in records}
+    # Extraction runs once per trial; every grouping below reuses the same audit.
+    pairs = [(record, audit_prose_claims(record)) for record in records]
 
-    def aggregate(rows):
+    def aggregate(selected):
+        rows = [record for record, _ in selected]
         times = sorted(r.duration_seconds for r in rows)
         product_rows = [r for r in rows if r.expected_kind == "product" and r.total_constraints]
         input_ok = rows and all(r.input_tokens is not None for r in rows)
         output_ok = rows and all(r.output_tokens is not None for r in rows)
         claims = structured_claim_summary(rows)
-        prose = aggregate_prose_audits([prose_audits[id(r)] for r in rows])
+        prose = aggregate_prose_audits([audit for _, audit in selected])
         return {
             "trials": len(rows), "successful": sum(r.is_successful for r in rows),
             "success_rate": sum(r.is_successful for r in rows) / len(rows) if rows else None,
@@ -98,13 +99,13 @@ def summarize(records: list[TrialResult]):
     }
     return {
         "identity": identity,
-        "overall": aggregate(records),
+        "overall": aggregate(pairs),
         "by_task": {
-            task: aggregate([r for r in records if r.task_id == task])
+            task: aggregate([pair for pair in pairs if pair[0].task_id == task])
             for task in sorted({r.task_id for r in records})
         },
         "by_difficulty": {
-            tier: aggregate([r for r in records if r.difficulty == tier])
+            tier: aggregate([pair for pair in pairs if pair[0].difficulty == tier])
             for tier in ("easy", "medium", "hard")
         },
     }
@@ -137,22 +138,37 @@ def enable_windows_ansi() -> None:
         pass
 
 
+def failure_detail(record: TrialResult) -> str:
+    """First line of the recorded error, or empty when the trial failed without one."""
+    return record.error.splitlines()[0].strip() if record.error else ""
+
+
 def failure_issue(record: TrialResult) -> str:
     """One label per trial, using the same category names as the JSON summary."""
     category = failure_category(record)
     if category is None:
         return "passed"
-    if record.error:
-        return f"{category.value}: {record.error.splitlines()[0].strip()}"
-    return category.value
+    detail = failure_detail(record)
+    return f"{category.value}: {detail}" if detail else category.value
 
 
 def common_failure_issue(records: list[TrialResult]) -> tuple[str, int] | None:
+    """Most common failure category, with its most common error text as the example.
+
+    Grouping is by category, never by error text, so the printed count is the same
+    number as ``failure_categories`` in the JSON summary for the same trials.
+    """
     failed = [record for record in records if not record.is_successful]
     if not failed:
         return None
-    issue, count = Counter(failure_issue(record) for record in failed).most_common(1)[0]
-    return issue, count
+    counts = Counter(failure_category(record).value for record in failed)
+    name, count = counts.most_common(1)[0]
+    details = Counter(
+        failure_detail(record) for record in failed
+        if failure_category(record).value == name and failure_detail(record)
+    )
+    example = details.most_common(1)[0][0] if details else ""
+    return (f"{name}: {example}" if example else name), count
 
 
 def format_trial_line(record: TrialResult, *, color: bool = False) -> str:
@@ -230,6 +246,13 @@ def print_run_summary(records: list[TrialResult], *, stream=None, include_trials
     print(text, file=stream, flush=True)
 
 
+def _purpose_counts(counts: dict[str, int]) -> str:
+    """Stable rendering of the call split, so a checked-in report does not churn."""
+    if not counts:
+        return "none"
+    return ", ".join(f"`{purpose}` {count}" for purpose, count in sorted(counts.items()))
+
+
 def markdown_report(records):
     report = summarize(records)
     identity = report["identity"]
@@ -244,7 +267,7 @@ def markdown_report(records):
         f"- Tokens (input/output/total): "
         f"`{overall['input_tokens']}` / `{overall['output_tokens']}` / `{overall['model_tokens']}` "
         f"across `{overall['token_usage_trials']}` measured trials",
-        f"- Tool calls by purpose: `{overall['tool_calls_by_purpose']}`",
+        f"- Tool calls by purpose: {_purpose_counts(overall['tool_calls_by_purpose'])}",
         f"- Unsupported-claim rate: `{overall['unsupported_claim_rate']}` over "
         f"{overall['assessable_claims']} checkable declared claims ("
         + ", ".join(f"{status} {count}"

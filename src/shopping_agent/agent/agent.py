@@ -18,6 +18,7 @@ from shopping_agent.contracts import (
     RequestInterpretation,
     SearchInput,
     ShoppingRequest,
+    listing_id_for,
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
@@ -796,13 +797,11 @@ class Agent:
         if listing_id and ":" not in listing_id:
             if not product_id:
                 product_id = listing_id
-            if store_id:
-                listing_id = f"{store_id}:{product_id}"
-            else:
-                listing_id = None
+            # A bare store plus a bare product is that store's listing key.
+            listing_id = listing_id_for(store_id, product_id) if store_id else None
         elif not listing_id and store_id and product_id:
             # An explicit store narrows the pick to that store's listing of the product.
-            listing_id = f"{store_id}:{product_id}"
+            listing_id = listing_id_for(store_id, product_id)
 
         key, candidates = observations.resolve(product_id, listing_id)
         if key is None and candidates:

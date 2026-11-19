@@ -11,12 +11,13 @@ from server.state import Store, load_examples
 from shopping_agent.agent.baselines import OfflineAgent
 from shopping_agent.agent.rules import RulesAgent, rank
 from shopping_agent.contracts import Constraint, Mutation, ProductObservation, SearchInput
+from shopping_agent.eval.metrics import claim_audit
 from shopping_agent.eval.report import summarize
 from shopping_agent.eval.runner import agent_input_for_task, isolated_trial, run_trial
 from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim
 from shopping_agent.tools.api import CatalogAPI, ToolError
-from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded
+from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded, verification_scope
 from shopping_agent.verifier import (
     check_constraints,
     verification_failure_reason,
@@ -335,13 +336,21 @@ def test_tool_budget_charges_gate_calls_against_the_same_limit():
     catalog, tasks = harness_examples()
     with TestClient(create_app(Store(catalog, tasks))) as client:
         tools = BudgetedTools(CatalogAPI(client), max_calls=2)
-        with tools.tracking_purpose("verification"):
+        with verification_scope(tools):
             tools.get_listing("ridge-shell")
         tools.search(SearchInput(query="jackets"))
         with pytest.raises(BudgetExceeded) as exc:
             tools.inspect_cart()
         assert exc.value.reason == "max_tool_calls_exceeded"
         assert [row.purpose for row in tools.trace] == ["verification", "agent"]
+
+
+def test_verification_scope_is_a_noop_for_tools_without_attribution():
+    """A plain ShoppingTools still works inside the scope; it just keeps the default."""
+    with verification_scope(object()):
+        pass
+    with verification_scope(object(), enabled=False):
+        pass
 
 
 def test_agent_input_copies_keep_each_trial_independent():
@@ -387,3 +396,41 @@ def test_unsupported_claim_rate_follows_structured_claims_only():
     quiet = summarize([no_claims])["overall"]
     assert quiet["unsupported_claim_rate"] is None
     assert quiet["assessable_claims"] == 0
+
+
+def test_claims_are_audited_against_the_listing_the_trial_used():
+    """Multi-store snapshots keep price on the listing, not on the product row."""
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    record = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"])
+    assert record.is_successful, record.model_dump()
+    assert record.claims  # The rules agent declares title and price.
+
+    # The winning listing's price, not a sibling store's and not the product row.
+    listing_id = record.selected_listing_ids[0]
+    assert record.final_state["listings"][listing_id]["price"] == 89
+    audit = claim_audit(record)
+    statuses = {row["field"]: row["status"] for row in audit}
+    assert statuses == {"title": "supports", "price": "supports"}
+    assert {row["observed_value"] for row in audit if row["field"] == "price"} == {89}
+
+    report = summarize([record])["overall"]
+    assert report["assessable_claims"] == 2
+    assert report["unsupported_claim_rate"] == 0
+
+
+def test_claim_against_an_ambiguous_product_without_a_used_listing_stays_unknown():
+    """An unfilled claim cannot borrow a sibling store's row."""
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    record = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"])
+    compared = record.model_copy(deep=True)
+    compared.selected_listing_ids = []
+    compared.cart_items = []
+    compared.claims = [row for row in record.claims if row["field"] == "price"]
+    # Two stores list this product, so no single listing backs the claim.
+    assert len(compared.final_state["listings"]) > 1
+    assert claim_audit(compared)[0]["status"] == "unknown"
+    assert summarize([compared])["overall"]["unsupported_claim_rate"] is None

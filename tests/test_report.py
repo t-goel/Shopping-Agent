@@ -7,6 +7,7 @@ from shopping_agent.eval.report import (
     common_failure_issue,
     format_run_summary,
     format_trial_line,
+    markdown_report,
 )
 
 
@@ -72,15 +73,45 @@ def test_format_run_summary_score_and_common_failure():
     assert "PASS  d [easy]" in text
     assert text.count("FAIL") == 3
     assert "Score: 1/4 (25%)" in text
-    # One label per failure: the category name leads the detail, matching the JSON summary.
+    # One label per failure: the category leads, and the count is the category's count,
+    # so the terminal line agrees with failure_categories in the JSON summary.
     assert (
-        "Common failure (2/3 failed): unrecoverable_failure: "
+        "Common failure (3/3 failed): unrecoverable_failure: "
         "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
     ) in text
-    assert common_failure_issue(records)[1] == 2
+    assert common_failure_issue(records)[1] == 3
     assert summarize(records)["overall"]["failure_categories"] == {"unrecoverable_failure": 3}
     issue = common_failure_issue(records)[0]
     assert issue.startswith(FailureCategory.UNRECOVERABLE_FAILURE.value)
+
+
+def test_common_failure_count_matches_the_category_counts():
+    """Two errors in one category are one failure group, not two."""
+    records = [
+        trial(task_id="a"),
+        trial(task_id="b", error="ValueError: other failure text"),
+        trial(task_id="c", termination_reason="timeout", error="trial timed out"),
+    ]
+    summary = summarize(records)["overall"]
+    issue, count = common_failure_issue(records)
+    assert issue.startswith("unrecoverable_failure: ")
+    assert count == summary["failure_categories"]["unrecoverable_failure"] == 2
+    assert summary["failure_categories"] == {"unrecoverable_failure": 2, "timeout": 1}
+
+
+def test_markdown_tool_call_split_is_stable():
+    records = [
+        trial(
+            task_id="a",
+            is_successful=True,
+            termination_reason="completed",
+            error=None,
+            tool_trace=[{"sequence": 1, "purpose": "verification"},
+                        {"sequence": 2, "purpose": "agent"}],
+        )
+    ]
+    text = markdown_report(records)
+    assert "- Tool calls by purpose: `agent` 1, `verification` 1" in text
 
 
 def test_all_pass_summary():
