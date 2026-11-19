@@ -638,7 +638,7 @@ class Agent:
                     if canonical == canonical_obs:
                         value = observed
                     else:
-                        value = canonical if isinstance(observed, str) else canonical
+                        value = canonical
                 else:
                     value = canonical
 
@@ -666,8 +666,6 @@ class Agent:
             # Numeric-string equivalence: observed is string but constraint value is numeric (e.g. "9" <-> 9)
             elif isinstance(value, (int, float)) and not isinstance(value, bool) and isinstance(observed, str):
                 if str(value) == observed or (isinstance(value, float) and value.is_integer() and str(int(value)) == observed):
-                    value = observed
-                elif constraint.attribute == "size" and canonicalize_size(value) == canonicalize_size(observed):
                     value = observed
 
             update_dict = {"value": value}
@@ -768,7 +766,13 @@ class Agent:
             if c1 is None or c2 is None:
                 return c1 != c2
             def key(c):
-                return (c.attribute, c.operator, c.value, c.hard, getattr(c, "tolerance", None))
+                return (
+                    c.attribute,
+                    str(c.operator),
+                    str(c.value),
+                    bool(c.hard),
+                    str(getattr(c, "tolerance", "")),
+                )
             return sorted([key(c) for c in c1]) != sorted([key(c) for c in c2])
 
         if is_repair and model_constraints is not None and _constraints_differ(model_constraints, active_constraints):

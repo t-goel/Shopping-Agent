@@ -27,6 +27,8 @@ _CANONICAL_SIZES = {
     "xxlarge": "XXL",
 }
 
+_ORDERED_SIZE_KEYS = sorted(_CANONICAL_SIZES.keys(), key=len, reverse=True)
+
 
 def canonicalize_size(val: Any) -> Any:
     """Canonicalize apparel and footwear sizes for alias and numeric-string equivalence."""
@@ -36,28 +38,42 @@ def canonicalize_size(val: Any) -> Any:
         f = float(val)
         return str(int(f)) if f.is_integer() else str(f)
     s = str(val).strip()
+    if not s:
+        return s
     s_cf = s.casefold()
     if s_cf in _CANONICAL_SIZES:
         return _CANONICAL_SIZES[s_cf]
 
-    # Check for numeric / US shoe sizing (e.g. "US 9 men's", "Men's US 9", "size 9", "9.5")
-    num_only_match = re.search(r"\b(\d+(?:\.\d+)?)\b", s_cf)
-    if num_only_match:
-        cleaned = re.sub(
-            r"\b(?:us|men'?s|mens|women'?s|womens|size|shoe|shoes|m|w)\b", "", s_cf
-        ).strip(": -")
-        cleaned = cleaned.strip()
-        try:
-            num = float(cleaned)
-            return str(int(num)) if num.is_integer() else str(num)
-        except ValueError:
-            pass
+    # Strip possessive 's to prevent possessive nouns from matching size "S"
+    cleaned_cf = re.sub(r"['’]s\b", "", s_cf)
+    cleaned_cf = re.sub(
+        r"\b(?:us|uk|eu|men|mens|women|womens|unisex|kids?|boys?|girls?|size|shoe|shoes)\b", " ", cleaned_cf
+    )
+    cleaned_cf = re.sub(r"[:\-_/]+", " ", cleaned_cf).strip()
 
-    # Check for embedded letter/word sizes
-    words = re.findall(r"\b[a-zA-Z0-9.-]+\b", s_cf)
-    for w in words:
-        if w in _CANONICAL_SIZES:
-            return _CANONICAL_SIZES[w]
+    if cleaned_cf in _CANONICAL_SIZES:
+        return _CANONICAL_SIZES[cleaned_cf]
+
+    # If cleaned text is purely numeric, return canonical numeric string
+    try:
+        num = float(cleaned_cf)
+        return str(int(num)) if num.is_integer() else str(num)
+    except ValueError:
+        pass
+
+    # Check for numeric pattern if embedded with shoe sizing qualifiers
+    num_match = re.search(r"\b(\d+(?:\.\d+)?)\b", cleaned_cf)
+    if num_match:
+        num_str = num_match.group(1)
+        rem = re.sub(r"\b" + re.escape(num_str) + r"\b", "", cleaned_cf).strip()
+        if not rem or rem in {"m", "w", "d", "ee"}:
+            num = float(num_str)
+            return str(int(num)) if num.is_integer() else str(num)
+
+    # Check for embedded letter/word sizes, checking longer phrases first
+    for k in _ORDERED_SIZE_KEYS:
+        if re.search(r"\b" + re.escape(k) + r"\b", cleaned_cf):
+            return _CANONICAL_SIZES[k]
 
     return s
 
@@ -70,8 +86,8 @@ def coerce_numeric(v: Any) -> float | None:
         return float(v)
     if isinstance(v, str):
         cleaned = v.strip()
+        cleaned = re.sub(r"^(?:approx(?:imately)?\.?|around|about)\s*", "", cleaned, flags=re.I)
         cleaned = re.sub(r"^[~$€£\s]+", "", cleaned)
-        cleaned = re.sub(r"^(?:approx(?:imately)?|around|about)\s*", "", cleaned, flags=re.I)
         cleaned = re.sub(
             r"\s*(?:usd|dollars?|bucks?|liters?|litres?|l)\b.*$", "", cleaned, flags=re.I
         )
@@ -112,6 +128,8 @@ def matches(product: Product, constraint: Constraint, tolerance: float | None = 
                 and isinstance(c_target, str)
                 and c_target.casefold() in c_val.casefold()
             )
+        value = c_val
+        target = c_target
 
     # Coerce numeric strings/units for numeric comparisons
     v_num = coerce_numeric(value)

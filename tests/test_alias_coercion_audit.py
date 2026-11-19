@@ -68,6 +68,14 @@ def test_canonicalize_size():
     assert canonicalize_size("Women's 8.5") == "8.5"
     assert canonicalize_size("size 9") == "9"
     assert canonicalize_size("10") == "10"
+    assert canonicalize_size("Men's Medium") == "M"
+    assert canonicalize_size("Men's Large") == "L"
+    assert canonicalize_size("Women's Small") == "S"
+    assert canonicalize_size("Size: Extra Large") == "XL"
+    assert canonicalize_size("Size Extra Small") == "XS"
+    assert canonicalize_size("Women's") == "Women's"
+    assert canonicalize_size("Men's") == "Men's"
+    assert canonicalize_size("Levi's") == "Levi's"
     assert canonicalize_size(None) is None
 
 
@@ -83,6 +91,12 @@ def test_coerce_numeric():
     assert coerce_numeric("30 liters") == 30.0
     assert coerce_numeric("~30L") == 30.0
     assert coerce_numeric("approx 30 liters") == 30.0
+    assert coerce_numeric("approx. 30 liters") == 30.0
+    assert coerce_numeric("approx $70") == 70.0
+    assert coerce_numeric("approx. $70") == 70.0
+    assert coerce_numeric("around $50") == 50.0
+    assert coerce_numeric("~ $70") == 70.0
+    assert coerce_numeric("about 25L") == 25.0
     assert coerce_numeric(True) is None
     assert coerce_numeric(False) is None
     assert coerce_numeric("not a number") is None
@@ -155,6 +169,12 @@ def test_matches_size_canonicalization():
     # 10 does NOT match "9"
     assert not matches(obs_shoe.product, Constraint(attribute="size", operator="eq", value=10))
     assert not matches(obs_shoe.product, Constraint(attribute="size", operator="eq", value="10"))
+
+    # Ordering comparisons on formatted shoe sizes
+    obs_shoe_half = _make_obs("shoe-9-5", "footwear", size="US 9.5 Men's")
+    assert matches(obs_shoe_half.product, Constraint(attribute="size", operator=Operator.GTE, value=9))
+    assert matches(obs_shoe_half.product, Constraint(attribute="size", operator=Operator.LTE, value=10))
+    assert not matches(obs_shoe_half.product, Constraint(attribute="size", operator=Operator.GTE, value=10))
 
 
 def test_verification_failure_observation_includes_observed_values():
@@ -255,3 +275,54 @@ def test_task_definition_constraints_property():
     for task in tasks.values():
         assert hasattr(task, "constraints")
         assert task.constraints == task.request.constraints
+
+
+def test_repair_differ_handles_heterogeneous_types():
+    """In repair turn, sorting constraints with mixed types does not raise TypeError."""
+    agent = Agent(api_key="test-key")
+    obs = _make_obs("prod-1", "bags", size="9", price=85.0, waterproof=True, stock=4, capacity_liters=30.0)
+
+    mock_tools = MagicMock()
+    mock_tools.get_listing.return_value = obs
+    mock_tools.inspect_cart.return_value = MagicMock(items=[])
+    mock_tools.add_to_cart.return_value = MagicMock(
+        items=[MagicMock(product_id="prod-1", quantity=1, in_stock=True, unit_price=85.0)]
+    )
+
+    # Active constraints have float tolerance on capacity and string size
+    captured_constraints = [
+        Constraint(attribute="capacity_liters", operator=Operator.EQ, value=30.0, tolerance=5.0, hard=True),
+        Constraint(attribute="size", operator=Operator.EQ, value="9", hard=True),
+        Constraint(attribute="price", operator=Operator.LTE, value=100.0, hard=True),
+    ]
+
+    # Model constraints have None tolerance and int size
+    corrected_decision = {
+        "status": "completed",
+        "product_id": "prod-1",
+        "response": "Selected prod-1.",
+        "constraints": [
+            {"attribute": "capacity_liters", "operator": "eq", "value": 30.0, "hard": True},
+            {"attribute": "size", "operator": "eq", "value": 9, "hard": True},
+            {"attribute": "price", "operator": "lte", "value": 100.0, "hard": True},
+        ],
+        "ranking_rule": "lowest_price",
+    }
+    answer = {"content": [{"type": "text", "text": json.dumps(corrected_decision)}], "stop_reason": "end_turn"}
+    inputs = AgentInput(
+        request=ShoppingRequest(original_text="Need a pack and shoes."),
+        ranking_rule="lowest_price",
+    )
+
+    # Should not raise TypeError: '<' not supported between instances
+    outcome = agent.finish(
+        decision=corrected_decision,
+        provider_answer=answer,
+        inputs=inputs,
+        tools=mock_tools,
+        products={"prod-1": obs},
+        active_constraints=captured_constraints,
+        active_ranking_rule="lowest_price",
+        is_repair=True,
+    )
+    assert outcome.termination_reason == "completed"
