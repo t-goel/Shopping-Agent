@@ -10,16 +10,19 @@ import requests
 from pydantic import ValidationError
 
 from shopping_agent.agent.request_parser import parse_request
+from shopping_agent.agent.rules import rank
 from shopping_agent.contracts import (
     CartSelection,
     ClaudeAnswer,
     Constraint,
+    Operator,
     RequestInterpretation,
     SearchInput,
     ShoppingRequest,
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
+from shopping_agent.tools.budget import BudgetExceeded
 from shopping_agent.verifier import (
     eligible,
     field_value,
@@ -88,6 +91,40 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
 ]
+
+
+_SIZE_ALIASES = {
+    "xs": "XS", "s": "S", "m": "M", "l": "L", "xl": "XL",
+    "extra small": "XS", "extra-small": "XS", "small": "S",
+    "medium": "M", "large": "L", "extra large": "XL", "extra-large": "XL",
+}
+
+
+def canonical_size(value) -> str | None:
+    """Canonicalize live interpreter size values before verification.
+
+    A provider may answer ``"medium"``, ``9`` or ``"US 9 men's"`` where the
+    catalog stores ``"M"`` or ``"9"``. Reduce both sides to a comparable token
+    so a correctly interpreted product is not rejected on a type/spelling
+    mismatch.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return str(int(number)) if number.is_integer() else str(number)
+    if isinstance(value, str):
+        text = value.strip()
+        number = re.search(r"\d+(?:\.\d+)?", text)
+        if number:
+            parsed = float(number.group(0))
+            return str(int(parsed)) if parsed.is_integer() else number.group(0)
+        key = text.casefold()
+        if key in _SIZE_ALIASES:
+            return _SIZE_ALIASES[key]
+        if text.upper() in {"XS", "S", "M", "L", "XL"}:
+            return text.upper()
+    return None
 
 
 PROMPT = """
@@ -211,6 +248,8 @@ class Agent:
         self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
         self.effort = effort or os.environ.get("ANTHROPIC_EFFORT", "high")
         self.max_turns = max_turns
+        # Provider calls actually made this trial: interpretation + every ReAct turn.
+        self.model_turns = 0
         self.url = "https://api.anthropic.com/v1/messages"
 
     def interpret_query(self, query: str) -> RequestInterpretation:
@@ -227,6 +266,8 @@ class Agent:
             req, rule = parse_request(query)
             return RequestInterpretation(request=req, ranking_rule=rule)
 
+        # The live interpretation call is a model turn; the test-key parser is not.
+        self.model_turns += 1
         response = self.ask_json(
             system=INTERPRETATION_PROMPT,
             content=query,
@@ -244,10 +285,12 @@ class Agent:
         self.input_tokens = None
         self.output_tokens = None
         self._missing_usage = set()
+        self.model_turns = 0
         if inputs.request.clarification_needed:
             return AgentOutput(
                 response_text=inputs.request.clarification_needed,
                 termination_reason="clarification_needed",
+                diagnostics={"model_turns": self.model_turns},
             )
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -274,6 +317,7 @@ class Agent:
 
         if clarification_needed:
             diagnostics["model_status"] = "clarification_needed"
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=clarification_needed,
                 termination_reason="clarification_needed",
@@ -297,6 +341,8 @@ class Agent:
         rejections: list[VerificationRejection] = []
 
         for turn in range(self.max_turns):
+            # Count every ReAct model call, including subclassed ask_claude stubs.
+            self.model_turns += 1
             answer = self.ask_claude(messages)
 
             if answer.get("stop_reason") != "tool_use":
@@ -332,13 +378,18 @@ class Agent:
                     rejections.append(outcome)
                     if answer.get("content"):
                         messages.append({"role": "assistant", "content": answer["content"]})
+                    turns_remaining = self.max_turns - turn - 1
+                    if turns_remaining <= 0:
+                        # No future turn can consume another observation. Stop asking
+                        # the model and use a tool-only deterministic runner-up instead.
+                        break
                     messages.append({
                         "role": "user",
                         "content": self._verification_observation(
                             outcome,
                             products,
                             rejected_ids=[item.product_id for item in rejections],
-                            turns_remaining=self.max_turns - turn - 1,
+                            turns_remaining=turns_remaining,
                         ),
                     })
                     continue
@@ -349,6 +400,7 @@ class Agent:
                     ]
                     if outcome.termination_reason == "completed":
                         outcome.diagnostics["recovered_after_rejection"] = True
+                outcome.diagnostics["model_turns"] = self.model_turns
                 last_response_error = None
                 return outcome
 
@@ -384,13 +436,29 @@ class Agent:
             messages.append({"role": "user", "content": tool_results})
 
         if rejections:
-            # The gate rejected every proposed product and no turn remains to retry.
+            # The gate rejected every proposed product and no model turn remains to
+            # repair it. Fall back to a deterministic re-rank (tool calls only) so the
+            # remaining public tool budget cannot be stranded by turn exhaustion.
             last = rejections[-1]
             diagnostics = dict(last.diagnostics)
             diagnostics["verification_rejections"] = [
                 rejection.as_dict() for rejection in rejections
             ]
+            fallback = self._deterministic_pick(
+                products, rejections, tools, active_constraints, active_ranking_rule,
+                diagnostics,
+            )
+            if fallback is not None:
+                fallback.diagnostics["verification_rejections"] = [
+                    rejection.as_dict() for rejection in rejections
+                ]
+                fallback.diagnostics["recovered_by_deterministic_fallback"] = True
+                fallback.diagnostics["model_turns"] = self.model_turns
+                return fallback
+            diagnostics["model_status"] = "no_valid_product"
             diagnostics["recovery_exhausted"] = True
+            diagnostics["deterministic_fallback_exhausted"] = True
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=(
                     "The selected product failed final verification after a catalog change, "
@@ -403,6 +471,126 @@ class Agent:
         if last_response_error is not None:
             raise last_response_error
         raise RuntimeError("Claude used too many turns")
+
+    @staticmethod
+    def _candidate_observations(products: dict) -> list:
+        """Unique observed products, keyed by store listing."""
+        seen = set()
+        candidates = []
+        for observation in products.values():
+            key = (observation.store_id, observation.product.product_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(observation)
+        return candidates
+
+    @staticmethod
+    def _remaining_tool_calls(tools) -> int | None:
+        """Public tool calls still available, or None for unbudgeted tools."""
+        max_calls = getattr(tools, "max_calls", None)
+        trace = getattr(tools, "trace", None)
+        if isinstance(max_calls, int) and isinstance(trace, (list, tuple)):
+            return max(0, max_calls - len(trace))
+        return None
+
+    def _deterministic_pick(
+        self, products, rejections, tools, constraints, rule, diagnostics
+    ):
+        """Re-rank observed candidates and buy the best eligible runner-up.
+
+        Mirrors ``RulesAgent``'s guarded re-rank: drop the rejected product,
+        re-rank the remaining observations, refresh the winner and re-check
+        eligibility and stock before the cart write. It spends public tool
+        calls but no model turn, so verification cannot deadlock a run that
+        still has tool budget. Returns None when no runner-up survives.
+        """
+        rejected_ids = {item.product_id for item in rejections}
+        candidates = [
+            observation
+            for observation in self._candidate_observations(products)
+            if observation.product.product_id not in rejected_ids
+        ]
+        if not candidates:
+            return None
+        remaining = self._remaining_tool_calls(tools)
+        if remaining is not None and remaining < 3:
+            return None
+
+        normalized = self.normalize_constraints(constraints or [], candidates)
+        current = rank(
+            [item for item in candidates if eligible(item, normalized)], rule
+        )
+        for candidate in current:
+            remaining = self._remaining_tool_calls(tools)
+            if remaining is not None and remaining < 3:
+                break
+            try:
+                latest = tools.get_listing(
+                    candidate.product.product_id,
+                    store_id=candidate.store_id,
+                    listing_id=candidate.listing_id,
+                )
+            except ToolError as exc:
+                if exc.status_code == 404:
+                    continue
+                raise
+            except BudgetExceeded:
+                return None
+            if not eligible(latest, normalized):
+                continue
+            try:
+                cart = tools.inspect_cart()
+                if cart.items:
+                    return None
+                selection = CartSelection(
+                    product_id=latest.product.product_id,
+                    quantity=1,
+                    store_id=latest.store_id,
+                    listing_id=latest.listing_id,
+                )
+                cart = tools.add_to_cart(selection)
+            except ToolError as exc:
+                if exc.status_code == 409:
+                    continue
+                raise
+            except BudgetExceeded:
+                return None
+            product = latest.product
+            if (
+                len(cart.items) != 1
+                or cart.items[0].product_id != product.product_id
+                or cart.items[0].quantity != 1
+                or not cart.items[0].in_stock
+                or cart.items[0].unit_price != product.price
+            ):
+                return None
+
+            claims = [Claim(
+                claim_id=f"{product.product_id}:price",
+                product_id=product.product_id,
+                field="price",
+                value=product.price,
+            )]
+            fallback_diagnostics = dict(diagnostics)
+            fallback_diagnostics["model_status"] = "completed"
+            fallback_diagnostics["listing_id"] = latest.listing_id
+            fallback_diagnostics["store_id"] = latest.store_id
+            fallback_diagnostics["selected_by"] = "deterministic_fallback"
+            fallback_diagnostics["model_turns"] = self.model_turns
+            return AgentOutput(
+                selected_product_ids=[product.product_id],
+                selected_listing_ids=[latest.listing_id] if latest.listing_id else [],
+                response_text=(
+                    f"Selected {product.title} for ${product.price:.2f} using the "
+                    "best remaining in-stock candidate after final verification failed."
+                ),
+                claims=claims,
+                evidence=verify_claims(latest, claims),
+                termination_reason="completed",
+                diagnostics=fallback_diagnostics,
+            )
+        return None
 
     @staticmethod
     def _verification_observation(
@@ -610,7 +798,13 @@ class Agent:
 
     @staticmethod
     def normalize_constraints(constraints, listings):
-        """Coerce constraint value types to match observed listing fields (verification only)."""
+        """Coerce live interpreter values to the types observed in listings.
+
+        Handles booleans/numbers given as strings plus provider-style sizes
+        (``medium``, ``9``, ``US 9 men's``) and approximate capacities stated
+        with ``eq``. Only called at verification time; the agent's declared
+        constraints are never rewritten for the model.
+        """
         normalized = []
         for constraint in constraints:
             observed = next(
@@ -618,6 +812,7 @@ class Agent:
                 None,
             )
             value = constraint.value
+            tolerance = constraint.tolerance
             if isinstance(value, str) and isinstance(observed, bool) and value.casefold() in {"true", "false"}:
                 value = value.casefold() == "true"
             elif isinstance(value, str) and isinstance(observed, (int, float)) and not isinstance(observed, bool):
@@ -625,7 +820,20 @@ class Agent:
                     value = type(observed)(value)
                 except ValueError:
                     pass
-            normalized.append(constraint.model_copy(update={"value": value}))
+            if constraint.attribute == "size":
+                observed_size = canonical_size(observed)
+                target_size = canonical_size(value)
+                if observed_size is not None and target_size == observed_size:
+                    value = observed_size
+            if (
+                constraint.attribute == "capacity_liters"
+                and constraint.operator == Operator.EQ
+                and isinstance(observed, (int, float))
+                and not isinstance(observed, bool)
+            ):
+                # "~30 liters" is often emitted as capacity_liters eq 30.
+                tolerance = 5.0 if tolerance is None else tolerance
+            normalized.append(constraint.model_copy(update={"value": value, "tolerance": tolerance}))
         return normalized
 
     def finish(
@@ -653,6 +861,32 @@ class Agent:
             diagnostics["model_constraints"] = decision["constraints"]
 
         if decision["status"] == "clarification_needed":
+            # A clarification loop is a false abstention when the products already
+            # observed contain an eligible, in-stock match for the interpreted
+            # constraints. Downgrade the ask into a deterministic product pick.
+            candidates = self._candidate_observations(products)
+            normalized = self.normalize_constraints(active_constraints or [], candidates)
+            valid = [item for item in candidates if eligible(item, normalized)]
+            if valid:
+                diagnostics["false_abstention_candidates"] = [
+                    {
+                        "product_id": item.product.product_id,
+                        "listing_id": item.listing_id,
+                        "store_id": item.store_id,
+                    }
+                    for item in rank(valid, active_ranking_rule)
+                ]
+                fallback = self._deterministic_pick(
+                    products, [], tools, active_constraints, active_ranking_rule,
+                    diagnostics,
+                )
+                if fallback is not None:
+                    fallback.diagnostics["coerced_from_clarification"] = True
+                    fallback.diagnostics["false_abstention_candidates"] = diagnostics[
+                        "false_abstention_candidates"
+                    ]
+                    return fallback
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=response_text,
                 termination_reason="clarification_needed",
