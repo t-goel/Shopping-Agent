@@ -37,11 +37,13 @@ def agent_input_for_task(task: TaskDefinition) -> AgentInput:
         return AgentInput(
             request=ShoppingRequest(original_text=task.request.original_text),
             ranking_rule=None,
+            task_constraints=list(task.constraints),
         )
 
     return AgentInput(
         request=task.request.model_copy(deep=True),
         ranking_rule=task.ranking_rule,
+        task_constraints=list(task.constraints),
     )
 
 

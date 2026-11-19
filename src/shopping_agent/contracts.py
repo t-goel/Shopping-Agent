@@ -220,6 +220,10 @@ class TaskDefinition(Contract):
 
         return self
 
+    @property
+    def constraints(self) -> list[Constraint]:
+        return self.request.constraints
+
 
 class SearchInput(Contract):
     query: str = Field(min_length=1, max_length=200)

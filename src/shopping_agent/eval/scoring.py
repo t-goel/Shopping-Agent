@@ -47,7 +47,7 @@ def _listing_product_view(snapshot: dict, listing_id: str) -> Product:
 def _score_listings(
     task: TaskDefinition, output: AgentOutput, snapshot: dict
 ) -> tuple[bool, int, int]:
-    hard_constraints = [c for c in task.request.constraints if c.hard]
+    hard_constraints = [c for c in task.constraints if c.hard]
     selected_listings = list(output.selected_listing_ids)
     if not selected_listings and output.selected_product_ids:
         # Fallback: infer listing from cart when agent only reported product_id.
@@ -157,7 +157,7 @@ def score(task: TaskDefinition, output: AgentOutput, snapshot: dict) -> tuple[bo
         key: Product.model_validate(value)
         for key, value in snapshot["products"].items()
     }
-    hard_constraints = [c for c in task.request.constraints if c.hard]
+    hard_constraints = [c for c in task.constraints if c.hard]
     selected = output.selected_product_ids
 
     satisfied = sum(

@@ -4,7 +4,7 @@ from typing import Literal, Protocol
 from pydantic import Field
 
 from shopping_agent.contracts import (
-    Attribute, CartSelection, Contract, EvidenceItem, ProductObservation,
+    Attribute, CartSelection, Constraint, Contract, EvidenceItem, ProductObservation,
     SearchInput, SearchResult, ShoppingRequest, StoreRecord,
 )
 
@@ -19,6 +19,7 @@ class AgentInput(Contract):
     ranking_rule: Literal[
         "lowest_price", "highest_rating", "highest_rating_then_reviews", "none"
     ] | None = None
+    task_constraints: list[Constraint] = Field(default_factory=list, exclude=True)
 
 
 class Claim(Contract):

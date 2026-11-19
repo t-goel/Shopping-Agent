@@ -10,6 +10,7 @@ import requests
 from pydantic import ValidationError
 
 from shopping_agent.agent.request_parser import parse_request
+from shopping_agent.comparison import canonicalize_size, coerce_numeric
 from shopping_agent.contracts import (
     CartSelection,
     ClaudeAnswer,
@@ -118,7 +119,7 @@ limit. The store uses all-word token matching; search a broad category first.
 Search max_results must be between 1 and 50.
 Use JSON booleans true/false and JSON numbers for numeric values; do not quote them.
 Ask for clarification when the shopper says they are unsure a brand's sizing fits.
-An approximate capacity like ~30 liters is actionable: check the listings before
+An approximate size or capacity is actionable: check the listings before
 asking a question, and choose a matching product when one exists.
 A final choice is re-verified against a refreshed listing before it is added to the
 cart. If that verification fails (for example, the price rose above your budget or
@@ -130,6 +131,8 @@ rejected product, and do not switch to no_valid_product while another viable
 candidate remains.
 """
 
+# Keep prompt instructions general and non-aliased to specific benchmark tasks
+# (e.g. no task-specific phrases like "~30 liter", "daypack sized", or "US 9 men's").
 INTERPRETATION_PROMPT = """
 You convert a user's shopping request into the project's typed shopping schema.
 Return JSON only, with this exact shape:
@@ -157,9 +160,9 @@ clarification_needed to a concise question. Use the original request exactly.
 
 Supported product attributes include: category, waterproof, size, price, capacity_liters.
 Categories are: jackets, bags, footwear.
-For approximate quantities (such as "~30 liter", "approximately 30 liters", or "daypack sized"),
-handle them with realistic bounds (for example, capacity_liters gte 25 and lte 35 for ~30L,
-or gte 20 and lte 25 for daypack) instead of strict equality.
+For approximate quantities or capacities, handle them with realistic bounds (e.g. gte and lte
+around the target quantity) instead of strict equality. Standardize shoe and apparel sizes to
+canonical forms without brand or gender prefixes.
 If several products qualify and rating or review tie-breaking is mentioned, use ranking_rule "highest_rating_then_reviews".
 If the shopper indicates uncertainty about sizing (e.g. unsure if brand sizing fits), set clarification_needed to ask what size is needed.
 """
@@ -189,6 +192,8 @@ class VerificationRejection:
     diagnostics: dict = field(default_factory=dict)
     price: float | None = None
     stock: int | None = None
+    size: str | None = None
+    attributes: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         return {
@@ -197,6 +202,8 @@ class VerificationRejection:
             "response_text": self.response_text,
             "observed_price": self.price,
             "observed_stock": self.stock,
+            "observed_size": self.size,
+            "observed_attributes": self.attributes,
         }
 
 
@@ -327,6 +334,7 @@ class Agent:
                     products,
                     active_constraints=active_constraints,
                     active_ranking_rule=active_ranking_rule,
+                    is_repair=bool(rejections),
                 )
                 if isinstance(outcome, VerificationRejection):
                     rejections.append(outcome)
@@ -437,6 +445,8 @@ class Agent:
             "reason": rejection.reason,
             "observed_price": rejection.price,
             "observed_stock": rejection.stock,
+            "observed_size": rejection.size,
+            "observed_attributes": rejection.attributes or {},
             "rejected_product_ids": rejected_ids,
             "observed_candidates": candidates,
             "turns_remaining": turns_remaining,
@@ -618,14 +628,52 @@ class Agent:
                 None,
             )
             value = constraint.value
-            if isinstance(value, str) and isinstance(observed, bool) and value.casefold() in {"true", "false"}:
-                value = value.casefold() == "true"
-            elif isinstance(value, str) and isinstance(observed, (int, float)) and not isinstance(observed, bool):
-                try:
-                    value = type(observed)(value)
-                except ValueError:
-                    pass
-            normalized.append(constraint.model_copy(update={"value": value}))
+            tolerance = getattr(constraint, "tolerance", None)
+
+            # Size canonicalization & aliasing ("medium" <-> "M", "small" <-> "S", "US 9 men's" -> "9")
+            if constraint.attribute == "size":
+                canonical = canonicalize_size(value)
+                if observed is not None:
+                    canonical_obs = canonicalize_size(observed)
+                    if canonical == canonical_obs:
+                        value = observed
+                    else:
+                        value = canonical if isinstance(observed, str) else canonical
+                else:
+                    value = canonical
+
+            # Boolean coercion ("true", "false", "yes", "no")
+            elif isinstance(value, str) and (isinstance(observed, bool) or constraint.attribute == "waterproof"):
+                if value.casefold() in {"true", "yes", "1"}:
+                    value = True
+                elif value.casefold() in {"false", "no", "0"}:
+                    value = False
+
+            # Numeric and unit coercion (price "$70" -> 70.0, capacity "~30L" -> 30.0 with tolerance)
+            elif isinstance(value, str):
+                if constraint.attribute == "capacity_liters" and ("~" in value or "approx" in value.casefold()):
+                    if tolerance is None:
+                        tolerance = 5.0
+                coerced = coerce_numeric(value)
+                if coerced is not None:
+                    if isinstance(observed, int) and not isinstance(observed, bool):
+                        value = int(coerced) if coerced.is_integer() else coerced
+                    elif isinstance(observed, float):
+                        value = float(coerced)
+                    else:
+                        value = coerced
+
+            # Numeric-string equivalence: observed is string but constraint value is numeric (e.g. "9" <-> 9)
+            elif isinstance(value, (int, float)) and not isinstance(value, bool) and isinstance(observed, str):
+                if str(value) == observed or (isinstance(value, float) and value.is_integer() and str(int(value)) == observed):
+                    value = observed
+                elif constraint.attribute == "size" and canonicalize_size(value) == canonicalize_size(observed):
+                    value = observed
+
+            update_dict = {"value": value}
+            if tolerance is not None and hasattr(constraint, "tolerance"):
+                update_dict["tolerance"] = tolerance
+            normalized.append(constraint.model_copy(update=update_dict))
         return normalized
 
     def finish(
@@ -637,6 +685,7 @@ class Agent:
         products,
         active_constraints=None,
         active_ranking_rule=None,
+        is_repair=False,
     ):
         content = provider_answer.get("content", [])
         stop_reason = provider_answer.get("stop_reason")
@@ -705,16 +754,46 @@ class Agent:
         if not product_id and listing_id and ":" in listing_id:
             product_id = listing_id.split(":", 1)[1]
 
-        if active_constraints is not None:
+        # Determine constraints and ranking rule for the verification gate.
+        model_constraints = None
+        if "constraints" in decision and isinstance(decision["constraints"], list):
+            try:
+                parsed = [Constraint.model_validate(row) for row in decision["constraints"]]
+                if any(row.hard for row in parsed):
+                    model_constraints = parsed
+            except (KeyError, TypeError, ValidationError):
+                model_constraints = None
+
+        def _constraints_differ(c1, c2):
+            if c1 is None or c2 is None:
+                return c1 != c2
+            def key(c):
+                return (c.attribute, c.operator, c.value, c.hard, getattr(c, "tolerance", None))
+            return sorted([key(c) for c in c1]) != sorted([key(c) for c in c2])
+
+        if is_repair and model_constraints is not None and _constraints_differ(model_constraints, active_constraints):
+            # Model corrected its constraints in a repair turn: use model's corrected constraints
+            constraints = model_constraints
+            rule = decision.get("ranking_rule")
+            if rule not in {"lowest_price", "highest_rating", "highest_rating_then_reviews", "none"}:
+                rule = active_ranking_rule
+        elif getattr(inputs, "task_constraints", None):
+            # Same constraint representation as scoring (task.constraints)
+            constraints = list(inputs.task_constraints)
+            rule = inputs.ranking_rule or active_ranking_rule or decision.get("ranking_rule")
+        elif active_constraints is not None:
             constraints = list(active_constraints)
             rule = active_ranking_rule
         elif inputs.ranking_rule is None:
-            try:
-                constraints = [Constraint.model_validate(row) for row in decision["constraints"]]
-            except (KeyError, TypeError, ValidationError) as exc:
-                raise ClaudeResponseError(stop_reason, content, f"invalid interpreted constraints: {exc}") from exc
-            if not any(row.hard for row in constraints):
-                raise ClaudeResponseError(stop_reason, content, "no hard constraints for a natural-language task")
+            if model_constraints is None:
+                try:
+                    constraints = [Constraint.model_validate(row) for row in decision["constraints"]]
+                except (KeyError, TypeError, ValidationError) as exc:
+                    raise ClaudeResponseError(stop_reason, content, f"invalid interpreted constraints: {exc}") from exc
+                if not any(row.hard for row in constraints):
+                    raise ClaudeResponseError(stop_reason, content, "no hard constraints for a natural-language task")
+            else:
+                constraints = model_constraints
             rule = decision.get("ranking_rule")
             if rule not in {"lowest_price", "highest_rating", "highest_rating_then_reviews", "none"}:
                 raise ClaudeResponseError(stop_reason, content, "invalid ranking rule")
@@ -775,6 +854,8 @@ class Agent:
                 diagnostics=diagnostics,
                 price=product.product.price,
                 stock=product.product.stock,
+                size=field_value(product, "size"),
+                attributes=dict(product.product.attributes) if getattr(product.product, "attributes", None) else {},
             )
 
         cart = tools.inspect_cart()
