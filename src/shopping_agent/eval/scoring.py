@@ -2,6 +2,7 @@
 
 from shopping_agent.comparison import matches
 from shopping_agent.contracts import Product, TaskDefinition
+from shopping_agent.eval.metrics import TERMINAL_FAILURE_REASONS
 from shopping_agent.example_checks import average_rating
 from shopping_agent.interfaces import AgentOutput
 
@@ -72,11 +73,7 @@ def _score_listings(
     )
     cart = snapshot["cart"]["items"]
 
-    if output.termination_reason in {
-        "timeout",
-        "max_tool_calls_exceeded",
-        "unrecoverable_failure",
-    }:
+    if output.termination_reason in TERMINAL_FAILURE_REASONS:
         return False, satisfied, len(hard_constraints)
 
     if task.expected.kind == "clarification":
@@ -166,7 +163,7 @@ def score(task: TaskDefinition, output: AgentOutput, snapshot: dict) -> tuple[bo
     )
     cart = snapshot["cart"]["items"]
 
-    if output.termination_reason in {"timeout", "max_tool_calls_exceeded", "unrecoverable_failure"}:
+    if output.termination_reason in TERMINAL_FAILURE_REASONS:
         return False, satisfied, len(hard_constraints)
 
     if task.expected.kind == "clarification":

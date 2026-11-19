@@ -1,4 +1,9 @@
-"""Read-only summaries; unavailable measurements stay null."""
+"""Read-only summaries; unavailable measurements stay null.
+
+Failure categories, claim verdicts, and call attribution all come from
+``eval.metrics`` so the terminal summary, the JSON summary, and the audit agree
+on terminology and on how a claim is scored.
+"""
 
 from __future__ import annotations
 
@@ -9,36 +14,19 @@ from collections import Counter
 from statistics import median
 
 from shopping_agent.contracts import TrialResult
-from shopping_agent.eval.prose_claims import unsupported_claim_rate
+from shopping_agent.eval.metrics import (
+    failure_category,
+    failure_category_legend,
+    structured_claim_summary,
+    tool_calls_by_purpose,
+)
+from shopping_agent.eval.prose_claims import aggregate_prose_audits, audit_prose_claims
 
 _GREEN = "\033[32m"
 _RED = "\033[31m"
 _BOLD = "\033[1m"
 _DIM = "\033[2m"
 _RESET = "\033[0m"
-
-
-def failure_category(record):
-    """Observable outcome categories, not speculative model root causes."""
-    if record.is_successful:
-        return None
-    if record.error:
-        return record.termination_reason
-    if record.termination_reason in {"timeout", "max_tool_calls_exceeded", "unrecoverable_failure"}:
-        return record.termination_reason
-    if record.expected_kind == "clarification":
-        return "clarification_mismatch"
-    if record.termination_reason == "clarification_needed":
-        # Product-task clarifications are unexpected asks, not constraint failures.
-        return "unexpected_clarification"
-    if record.termination_reason == "no_valid_product":
-        # Only a false abstention when a product selection was required.
-        if record.expected_kind == "product":
-            return "incorrect_abstention"
-        return "abstention_mismatch"
-    if record.expected_kind == "product" and record.constraints_satisfied < record.total_constraints:
-        return "hard_constraint_violation"
-    return "selection_or_cart_mismatch"
 
 
 def _condition_parts(records: list[TrialResult]):
@@ -54,11 +42,16 @@ def summarize(records: list[TrialResult]):
     if len(agents) > 1 or len(concrete_surfaces) > 1:
         raise ValueError("Report one agent/model/prompt/input surface at a time; do not pool unlike conditions.")
 
+    # Prose extraction runs once per trial and is reused by every grouping below.
+    prose_audits = {id(record): audit_prose_claims(record) for record in records}
+
     def aggregate(rows):
         times = sorted(r.duration_seconds for r in rows)
         product_rows = [r for r in rows if r.expected_kind == "product" and r.total_constraints]
         input_ok = rows and all(r.input_tokens is not None for r in rows)
         output_ok = rows and all(r.output_tokens is not None for r in rows)
+        claims = structured_claim_summary(rows)
+        prose = aggregate_prose_audits([prose_audits[id(r)] for r in rows])
         return {
             "trials": len(rows), "successful": sum(r.is_successful for r in rows),
             "success_rate": sum(r.is_successful for r in rows) / len(rows) if rows else None,
@@ -69,8 +62,22 @@ def summarize(records: list[TrialResult]):
             "median_duration_seconds": median(times) if times else None,
             "p95_duration_seconds": times[math.ceil(.95 * len(times)) - 1] if times else None,
             "median_tool_calls": median(r.tool_calls for r in rows) if rows else None,
-            "failure_categories": dict(Counter(failure_category(r) for r in rows if not r.is_successful)),
-            "unsupported_claim_rate": unsupported_claim_rate(rows), "human_rating": None,
+            "tool_calls_by_purpose": tool_calls_by_purpose(rows),
+            "failure_categories": {
+                category.value: count
+                for category, count in Counter(
+                    failure_category(r) for r in rows if not r.is_successful).items()
+            },
+            # Declared structured claims checked against the final catalog state.
+            "structured_claims": claims["structured_claims"],
+            "assessable_claims": claims["assessable_claims"],
+            "trials_with_claims": claims["trials_with_claims"],
+            "unsupported_claim_rate": claims["unsupported_claim_rate"],
+            # Secondary advisory extraction from the explanation prose.
+            "prose_claims": prose["prose_claims"],
+            "assessable_prose_claims": prose["assessable_prose_claims"],
+            "prose_claim_contradiction_rate": prose["prose_claim_contradiction_rate"],
+            "human_rating": None,
             "model_cost_usd": (sum(r.cost_usd for r in rows)
                                if rows and all(r.cost_usd is not None for r in rows) else None),
             "input_tokens": sum(r.input_tokens for r in rows) if input_ok else None,
@@ -131,11 +138,13 @@ def enable_windows_ansi() -> None:
 
 
 def failure_issue(record: TrialResult) -> str:
+    """One label per trial, using the same category names as the JSON summary."""
+    category = failure_category(record)
+    if category is None:
+        return "passed"
     if record.error:
-        return record.error.splitlines()[0].strip()
-    if record.termination_reason == "completed":
-        return "incorrect outcome"
-    return record.termination_reason.replace("_", " ")
+        return f"{category.value}: {record.error.splitlines()[0].strip()}"
+    return category.value
 
 
 def common_failure_issue(records: list[TrialResult]) -> tuple[str, int] | None:
@@ -235,6 +244,13 @@ def markdown_report(records):
         f"- Tokens (input/output/total): "
         f"`{overall['input_tokens']}` / `{overall['output_tokens']}` / `{overall['model_tokens']}` "
         f"across `{overall['token_usage_trials']}` measured trials",
+        f"- Tool calls by purpose: `{overall['tool_calls_by_purpose']}`",
+        f"- Unsupported-claim rate: `{overall['unsupported_claim_rate']}` over "
+        f"{overall['assessable_claims']} checkable declared claims ("
+        + ", ".join(f"{status} {count}"
+                    for status, count in overall["structured_claims"].items()) + ")",
+        f"- Prose claim contradiction rate (advisory): `{overall['prose_claim_contradiction_rate']}` "
+        f"over {overall['assessable_prose_claims']} extracted facts",
         "",
         "| Task | Successful / trials | Median calls | Median seconds | p95 seconds |",
         "|---|---:|---:|---:|---:|",
@@ -261,12 +277,17 @@ def markdown_report(records):
             f"- {r.task_id}, repetition {r.trial_number}: {failure_category(r)}; "
             f"termination={r.termination_reason}; selected={r.selected_product_ids}."
         )
+    lines.extend(["", "## Failure categories", ""])
+    for name, description in failure_category_legend().items():
+        lines.append(f"- `{name}`: {description}.")
     lines.extend([
         "",
         "Categories describe observed outcomes; root causes require trace inspection.",
         "Repeated trials are not independent tasks. API timings are not browser timings.",
         "Missing token/cost measurements remain null; no price estimate is invented.",
-        "Unsupported-claim rate is the share of explanation facts that contradict recorded listing observations. It is null when the run states no checkable product fact.",
+        "Unsupported-claim rate is the share of declared structured claims that contradict the final catalog state. It is null when the run declares no checkable claim.",
+        "Prose claim contradiction rate is a separate advisory extraction from the explanation text; windowed matching can mis-attribute a nearby fact, so it never replaces the structured rate.",
+        "Tool calls by purpose separates agent exploration from the deterministic gate's verification reads; every call is charged once against the trial budget.",
         "",
     ])
     return "\n".join(lines)

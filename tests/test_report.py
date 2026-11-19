@@ -1,7 +1,9 @@
 """Terminal evaluation summary formatting (mock trials only)."""
 
 from shopping_agent.contracts import TrialResult
+from shopping_agent.eval.metrics import FailureCategory
 from shopping_agent.eval.report import (
+    summarize,
     common_failure_issue,
     format_run_summary,
     format_trial_line,
@@ -70,8 +72,15 @@ def test_format_run_summary_score_and_common_failure():
     assert "PASS  d [easy]" in text
     assert text.count("FAIL") == 3
     assert "Score: 1/4 (25%)" in text
-    assert "Common failure (2/3 failed): JSONDecodeError: Expecting value: line 1 column 1 (char 0)" in text
+    # One label per failure: the category name leads the detail, matching the JSON summary.
+    assert (
+        "Common failure (2/3 failed): unrecoverable_failure: "
+        "JSONDecodeError: Expecting value: line 1 column 1 (char 0)"
+    ) in text
     assert common_failure_issue(records)[1] == 2
+    assert summarize(records)["overall"]["failure_categories"] == {"unrecoverable_failure": 3}
+    issue = common_failure_issue(records)[0]
+    assert issue.startswith(FailureCategory.UNRECOVERABLE_FAILURE.value)
 
 
 def test_all_pass_summary():

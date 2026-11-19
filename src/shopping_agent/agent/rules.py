@@ -3,6 +3,7 @@
 from shopping_agent.contracts import CartSelection, ProductObservation, SearchInput
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
+from shopping_agent.tools.budget import verification_scope
 from shopping_agent.verifier import eligible, verify_claims
 
 
@@ -99,17 +100,19 @@ class RulesAgent:
             candidate = rank(current, inputs.ranking_rule)[0]
             candidate_key = _listing_key(candidate)
 
-            try:
-                latest = tools.get_listing(
-                    candidate.product.product_id,
-                    store_id=candidate.store_id,
-                    listing_id=candidate.listing_id,
-                )
-            except ToolError as exc:
-                if exc.status_code != 404:
-                    raise
-                current = [item for item in current if _listing_key(item) != candidate_key]
-                continue
+            # The re-read above the loop is exploration; this one is the gate.
+            with verification_scope(tools):
+                try:
+                    latest = tools.get_listing(
+                        candidate.product.product_id,
+                        store_id=candidate.store_id,
+                        listing_id=candidate.listing_id,
+                    )
+                except ToolError as exc:
+                    if exc.status_code != 404:
+                        raise
+                    current = [item for item in current if _listing_key(item) != candidate_key]
+                    continue
 
             current = [item for item in current if _listing_key(item) != candidate_key]
 
@@ -127,13 +130,14 @@ class RulesAgent:
                 store_id=latest.store_id,
                 listing_id=latest.listing_id,
             )
-            try:
-                cart = tools.add_to_cart(selection)
-            except ToolError as exc:
-                if exc.status_code == 409:
-                    current = [item for item in current if _listing_key(item) != candidate_key]
-                    continue
-                raise
+            with verification_scope(tools):
+                try:
+                    cart = tools.add_to_cart(selection)
+                except ToolError as exc:
+                    if exc.status_code == 409:
+                        current = [item for item in current if _listing_key(item) != candidate_key]
+                        continue
+                    raise
 
             product = latest.product
 
