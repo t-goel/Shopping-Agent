@@ -82,10 +82,10 @@ never appears under two names:
   the same label as the JSON summary.
 - `unsupported_claim_rate` is computed only from the claims the agent declares
   in its final decision, checked against the final catalog state: the listing the
-  trial carted or selected when price and stock live on the listing (multi-store),
-  and the product row otherwise. A claim whose product ID names several stores
-  and no used listing stays unassessable. The rate is null when the run declares
-  nothing checkable.
+  trial carted or selected, or the product's only listing, when price and stock
+  live on the listing (multi-store), and the product row otherwise. A claim whose
+  product ID names several stores and no used listing stays unassessable. The
+  rate is null when the run declares nothing checkable.
 - `prose_claim_contradiction_rate` is a separate advisory reading of the
   explanation text. Windowed matching can attach a nearby figure to the wrong
   product, so it is reported next to the structured rate and never replaces it.

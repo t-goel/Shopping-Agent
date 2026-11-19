@@ -152,14 +152,15 @@ def _listing_products(record: TrialResult, snapshot: dict) -> dict[str, Product]
 def final_products(record: TrialResult) -> dict[str, Product]:
     """Authoritative product facts from the trial's final catalog snapshot.
 
-    Single-store snapshots put price and stock on the product row. Multi-store
-    snapshots put them on each listing, so those trials are read through
-    ``_listing_products`` instead of losing every row to validation.
+    A multi-store snapshot keeps price and stock on each listing, so those trials
+    are read through ``_listing_products``; a listing view wins over the product
+    row wherever one resolves, because the row does not carry this store's offer.
+    Single-store snapshots have no listings and are read from the product rows.
     """
-    products: dict[str, Product] = {}
     snapshot = record.final_state
     if not isinstance(snapshot, dict):
-        return products
+        return {}
+    products = _listing_products(record, snapshot)
     rows = snapshot.get("products")
     if isinstance(rows, dict):
         for product_id, value in rows.items():
@@ -169,8 +170,8 @@ def final_products(record: TrialResult) -> dict[str, Product]:
                 # Missing or malformed facts cannot support a claim.
                 continue
             if product.product_id == product_id:
-                products[product_id] = product
-    products.update(_listing_products(record, snapshot))
+                # A bare row only fills products the listings could not resolve.
+                products.setdefault(product_id, product)
     return products
 
 

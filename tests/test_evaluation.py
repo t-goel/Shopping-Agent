@@ -430,7 +430,9 @@ def test_claim_against_an_ambiguous_product_without_a_used_listing_stays_unknown
     compared.selected_listing_ids = []
     compared.cart_items = []
     compared.claims = [row for row in record.claims if row["field"] == "price"]
-    # Two stores list this product, so no single listing backs the claim.
-    assert len(compared.final_state["listings"]) > 1
+    # Three stores list this product, so no single listing backs the claim.
+    listed_in = [key for key, row in compared.final_state["listings"].items()
+                 if row["product_id"] == "ridge-shell"]
+    assert len(listed_in) == 3
     assert claim_audit(compared)[0]["status"] == "unknown"
     assert summarize([compared])["overall"]["unsupported_claim_rate"] is None
