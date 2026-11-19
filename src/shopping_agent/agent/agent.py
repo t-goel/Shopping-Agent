@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from shopping_agent.agent.request_parser import parse_request
 from shopping_agent.agent.rules import rank
+from shopping_agent.comparison import canonical_size
 from shopping_agent.contracts import (
     CartSelection,
     ClaudeAnswer,
@@ -91,40 +92,6 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}},
     },
 ]
-
-
-_SIZE_ALIASES = {
-    "xs": "XS", "s": "S", "m": "M", "l": "L", "xl": "XL",
-    "extra small": "XS", "extra-small": "XS", "small": "S",
-    "medium": "M", "large": "L", "extra large": "XL", "extra-large": "XL",
-}
-
-
-def canonical_size(value) -> str | None:
-    """Canonicalize live interpreter size values before verification.
-
-    A provider may answer ``"medium"``, ``9`` or ``"US 9 men's"`` where the
-    catalog stores ``"M"`` or ``"9"``. Reduce both sides to a comparable token
-    so a correctly interpreted product is not rejected on a type/spelling
-    mismatch.
-    """
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        number = float(value)
-        return str(int(number)) if number.is_integer() else str(number)
-    if isinstance(value, str):
-        text = value.strip()
-        number = re.search(r"\d+(?:\.\d+)?", text)
-        if number:
-            parsed = float(number.group(0))
-            return str(int(parsed)) if parsed.is_integer() else number.group(0)
-        key = text.casefold()
-        if key in _SIZE_ALIASES:
-            return _SIZE_ALIASES[key]
-        if text.upper() in {"XS", "S", "M", "L", "XL"}:
-            return text.upper()
-    return None
 
 
 PROMPT = """
@@ -310,6 +277,12 @@ class Agent:
             clarification_needed = inputs.request.clarification_needed
             preferences = list(inputs.request.preferences)
 
+        # Only treat a capacity eq as approximate when the request actually says so.
+        approximate_capacity = bool(re.search(
+            r"~|approx(?:imately)?\b|about\b|around\b|roughly\b",
+            inputs.request.original_text, re.IGNORECASE,
+        ))
+
         diagnostics = {
             "extracted_constraints": [c.model_dump(mode="json") for c in active_constraints],
             "interpreted_ranking_rule": active_ranking_rule,
@@ -373,6 +346,7 @@ class Agent:
                     products,
                     active_constraints=active_constraints,
                     active_ranking_rule=active_ranking_rule,
+                    approximate_capacity=approximate_capacity,
                 )
                 if isinstance(outcome, VerificationRejection):
                     rejections.append(outcome)
@@ -446,7 +420,7 @@ class Agent:
             ]
             fallback = self._deterministic_pick(
                 products, rejections, tools, active_constraints, active_ranking_rule,
-                diagnostics,
+                diagnostics, approximate_capacity=approximate_capacity,
             )
             if fallback is not None:
                 fallback.diagnostics["verification_rejections"] = [
@@ -486,6 +460,32 @@ class Agent:
         return candidates
 
     @staticmethod
+    def _clarification_hits_unconstrained_attribute(text, constraints, listings) -> bool:
+        """True when the question asks about an attribute no hard constraint covers.
+
+        A clarification about such an attribute cannot be answered from the
+        request alone, so coercing it into a purchase would guess at an
+        unspecified user preference. Questions about attributes the request
+        already constrains are candidates for the false-abstention fallback.
+        """
+        covered = {
+            item.attribute.casefold().replace("_", " ")
+            for item in constraints if item.hard
+        }
+        lowered = (text or "").casefold()
+        attributes = set()
+        for observation in listings:
+            attributes.update(observation.product.attributes)
+        for attribute in attributes:
+            token = str(attribute).casefold().replace("_", " ")
+            root = token.split(" ", 1)[0]
+            if not root or token in covered or root in covered:
+                continue
+            if re.search(rf"\b{re.escape(root)}", lowered):
+                return True
+        return False
+
+    @staticmethod
     def _remaining_tool_calls(tools) -> int | None:
         """Public tool calls still available, or None for unbudgeted tools."""
         max_calls = getattr(tools, "max_calls", None)
@@ -495,7 +495,8 @@ class Agent:
         return None
 
     def _deterministic_pick(
-        self, products, rejections, tools, constraints, rule, diagnostics
+        self, products, rejections, tools, constraints, rule, diagnostics,
+        approximate_capacity: bool = False,
     ):
         """Re-rank observed candidates and buy the best eligible runner-up.
 
@@ -517,7 +518,9 @@ class Agent:
         if remaining is not None and remaining < 3:
             return None
 
-        normalized = self.normalize_constraints(constraints or [], candidates)
+        normalized = self.normalize_constraints(
+            constraints or [], candidates, approximate_capacity
+        )
         current = rank(
             [item for item in candidates if eligible(item, normalized)], rule
         )
@@ -573,7 +576,9 @@ class Agent:
                 value=product.price,
             )]
             fallback_diagnostics = dict(diagnostics)
-            fallback_diagnostics["model_status"] = "completed"
+            # Keep model_status as the model's own decision; the fallback is
+            # distinguished by termination_reason and selected_by.
+            fallback_diagnostics["fallback_status"] = "completed"
             fallback_diagnostics["listing_id"] = latest.listing_id
             fallback_diagnostics["store_id"] = latest.store_id
             fallback_diagnostics["selected_by"] = "deterministic_fallback"
@@ -583,7 +588,11 @@ class Agent:
                 selected_listing_ids=[latest.listing_id] if latest.listing_id else [],
                 response_text=(
                     f"Selected {product.title} for ${product.price:.2f} using the "
-                    "best remaining in-stock candidate after final verification failed."
+                    + (
+                        "best remaining in-stock candidate after final verification failed."
+                        if rejections else
+                        "best in-stock match for the interpreted request."
+                    )
                 ),
                 claims=claims,
                 evidence=verify_claims(latest, claims),
@@ -797,13 +806,14 @@ class Agent:
         return text
 
     @staticmethod
-    def normalize_constraints(constraints, listings):
+    def normalize_constraints(constraints, listings, approximate_capacity: bool = False):
         """Coerce live interpreter values to the types observed in listings.
 
         Handles booleans/numbers given as strings plus provider-style sizes
-        (``medium``, ``9``, ``US 9 men's``) and approximate capacities stated
-        with ``eq``. Only called at verification time; the agent's declared
-        constraints are never rewritten for the model.
+        (``medium``, ``9``, ``US 9 men's``). A tolerance is added to a capacity
+        ``eq`` only when the request actually describes an approximate amount.
+        Only called at verification time; the agent's declared constraints are
+        never rewritten for the model.
         """
         normalized = []
         for constraint in constraints:
@@ -826,12 +836,14 @@ class Agent:
                 if observed_size is not None and target_size == observed_size:
                     value = observed_size
             if (
-                constraint.attribute == "capacity_liters"
+                approximate_capacity
+                and constraint.attribute == "capacity_liters"
                 and constraint.operator == Operator.EQ
                 and isinstance(observed, (int, float))
                 and not isinstance(observed, bool)
             ):
-                # "~30 liters" is often emitted as capacity_liters eq 30.
+                # "~30 liters" may be emitted as capacity_liters eq 30; only
+                # relax it when the request signalled an approximation.
                 tolerance = 5.0 if tolerance is None else tolerance
             normalized.append(constraint.model_copy(update={"value": value, "tolerance": tolerance}))
         return normalized
@@ -845,6 +857,7 @@ class Agent:
         products,
         active_constraints=None,
         active_ranking_rule=None,
+        approximate_capacity: bool = False,
     ):
         content = provider_answer.get("content", [])
         stop_reason = provider_answer.get("stop_reason")
@@ -865,7 +878,9 @@ class Agent:
             # observed contain an eligible, in-stock match for the interpreted
             # constraints. Downgrade the ask into a deterministic product pick.
             candidates = self._candidate_observations(products)
-            normalized = self.normalize_constraints(active_constraints or [], candidates)
+            normalized = self.normalize_constraints(
+                active_constraints or [], candidates, approximate_capacity
+            )
             valid = [item for item in candidates if eligible(item, normalized)]
             if valid:
                 diagnostics["false_abstention_candidates"] = [
@@ -876,16 +891,23 @@ class Agent:
                     }
                     for item in rank(valid, active_ranking_rule)
                 ]
-                fallback = self._deterministic_pick(
-                    products, [], tools, active_constraints, active_ranking_rule,
-                    diagnostics,
-                )
-                if fallback is not None:
-                    fallback.diagnostics["coerced_from_clarification"] = True
-                    fallback.diagnostics["false_abstention_candidates"] = diagnostics[
-                        "false_abstention_candidates"
-                    ]
-                    return fallback
+                if self._clarification_hits_unconstrained_attribute(
+                    response_text, active_constraints or [], candidates
+                ):
+                    # The question asks about an attribute the request never
+                    # constrained: answering it requires the user, not a guess.
+                    diagnostics["clarification_preserved_for_unconstrained_attribute"] = True
+                else:
+                    fallback = self._deterministic_pick(
+                        products, [], tools, active_constraints, active_ranking_rule,
+                        diagnostics, approximate_capacity=approximate_capacity,
+                    )
+                    if fallback is not None:
+                        fallback.diagnostics["coerced_from_clarification"] = True
+                        fallback.diagnostics["false_abstention_candidates"] = diagnostics[
+                            "false_abstention_candidates"
+                        ]
+                        return fallback
             diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=response_text,
@@ -988,7 +1010,9 @@ class Agent:
         products[product_id] = product
         if product.listing_id:
             products[product.listing_id] = product
-        constraints = self.normalize_constraints(constraints, [product])
+        constraints = self.normalize_constraints(
+            constraints, [product], approximate_capacity
+        )
         diagnostics["interpreted_constraints"] = [row.model_dump(mode="json") for row in constraints]
         diagnostics["eligible_product_ids"] = (
             [product_id] if eligible(product, constraints) else []

@@ -4,7 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from shopping_agent.agent.agent import Agent
-from shopping_agent.contracts import ClaudeAnswer, Constraint, ProductObservation
+from shopping_agent.contracts import (
+    ClaudeAnswer,
+    Constraint,
+    ProductObservation,
+    RequestInterpretation,
+    ShoppingRequest,
+)
 from shopping_agent.verifier import eligible
 
 
@@ -243,10 +249,38 @@ def test_false_clarification_is_coerced_to_a_product_pick():
     assert result.cart_items[0].product_id == "basalt-carryall"
     diagnostics = result.agent_diagnostics
     assert diagnostics["coerced_from_clarification"] is True
-    assert diagnostics["model_status"] == "completed"
+    # model_status still records what the model actually returned.
+    assert diagnostics["model_status"] == "clarification_needed"
+    assert diagnostics["fallback_status"] == "completed"
     candidates = diagnostics["false_abstention_candidates"]
     assert any(item["product_id"] == "basalt-carryall" for item in candidates)
     assert diagnostics["model_turns"] == 2
+
+
+def test_genuine_clarification_after_search_is_not_overridden():
+    """A question about an attribute the request never constrained stands."""
+    catalog, tasks = load_examples()
+    task = tasks["clarify_jacket_size_nl"]
+    clarification = '''{"status":"clarification_needed","product_id":"",
+      "response":"What jacket size do you need?"}'''
+    agent = ScriptedClaude([search("jackets"), final(clarification)])
+    # Simulate a live interpreter that did not pre-flag the ambiguity.
+    agent.interpretation = RequestInterpretation(
+        request=ShoppingRequest(
+            original_text=task.request.original_text,
+            constraints=[c.model_copy(deep=True) for c in task.request.constraints],
+        ),
+        ranking_rule=task.ranking_rule,
+    )
+    result = run_trial(catalog, task, agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.termination_reason == "clarification_needed"
+    assert result.selected_product_ids == []
+    assert not result.cart_items
+    assert result.agent_diagnostics["model_status"] == "clarification_needed"
+    assert result.agent_diagnostics["clarification_preserved_for_unconstrained_attribute"] is True
+    assert result.agent_diagnostics["false_abstention_candidates"]
+    assert not result.agent_diagnostics.get("coerced_from_clarification")
 
 
 def test_search_limit_is_bounded_to_public_tool_schema():
@@ -531,7 +565,7 @@ def test_live_style_interpreter_sizes_are_normalized(product_id, value, expected
     assert eligible(observation, normalized)
 
 
-def test_capacity_liters_eq_from_interpreter_gets_realistic_tolerance():
+def test_capacity_liters_eq_tolerance_requires_approximate_request():
     catalog, _ = load_examples()
     product = next(item for item in catalog.products if item.product_id == "basalt-carryall")
     observation = _observation(product)
@@ -539,6 +573,15 @@ def test_capacity_liters_eq_from_interpreter_gets_realistic_tolerance():
         normalized = Agent.normalize_constraints(
             [Constraint(attribute="capacity_liters", operator="eq", value=value)],
             [observation],
+            approximate_capacity=True,
         )
         assert normalized[0].tolerance == 5.0
         assert eligible(observation, normalized) is should_match
+
+    # An exact "eq 34" must not inherit the approximate tolerance and admit a 30 L bag.
+    exact = Agent.normalize_constraints(
+        [Constraint(attribute="capacity_liters", operator="eq", value=34)],
+        [observation],
+    )
+    assert exact[0].tolerance is None
+    assert not eligible(observation, exact)
