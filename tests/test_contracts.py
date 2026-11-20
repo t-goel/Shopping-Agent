@@ -151,3 +151,33 @@ def test_claude_answer_accepts_listing_id_and_normalizes():
     assert ans2.product_id == "ridge-shell"
     assert ans2.store_id == "trailworks-direct"
 
+
+def test_task_definition_constraints_contract():
+    catalog, tasks = load_examples()
+    for name, task in tasks.items():
+        assert hasattr(task, "constraints")
+        assert task.constraints == task.request.constraints
+        assert all(isinstance(c, Constraint) for c in task.constraints)
+
+    _, harness_tasks = load_examples(tasks_path=HARNESS_TASKS)
+    for name, task in harness_tasks.items():
+        assert hasattr(task, "constraints")
+        assert task.constraints == task.request.constraints
+
+
+def test_agent_input_task_constraints_contract():
+    from shopping_agent.interfaces import AgentInput
+    from shopping_agent.contracts import ShoppingRequest, Constraint, Operator
+
+    req = ShoppingRequest(original_text="Need a jacket")
+    c = Constraint(attribute="category", operator=Operator.EQ, value="jackets", hard=True)
+    inp = AgentInput(request=req, task_constraints=[c])
+    assert inp.task_constraints == [c]
+
+    # task_constraints must be excluded from serialization
+    dumped = inp.model_dump()
+    assert "task_constraints" not in dumped
+    dumped_json = inp.model_dump_json()
+    assert "task_constraints" not in dumped_json
+
+

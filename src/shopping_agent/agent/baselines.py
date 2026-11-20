@@ -142,7 +142,12 @@ def interpret_request(text: str) -> tuple[list[Constraint], str | None, str | No
         _add(constraints, "capacity_liters", "gte", 20)
         _add(constraints, "capacity_liters", "lte", 25)
     elif liters:
-        _add(constraints, "capacity_liters", "eq", float(liters.group("liters")))
+        val = float(liters.group("liters"))
+        if "~" in liters.group(0) or re.search(r"\b(?:approx(?:imately)?|around|about)\b", normalized):
+            _add(constraints, "capacity_liters", "gte", max(1.0, val - 5.0))
+            _add(constraints, "capacity_liters", "lte", val + 5.0)
+        else:
+            _add(constraints, "capacity_liters", "eq", val)
 
     if re.search(r"\b(?:cheapest|lowest[-\s]?priced|least expensive|most affordable|lowest price)\b", normalized):
         ranking: str | None = "lowest_price"
