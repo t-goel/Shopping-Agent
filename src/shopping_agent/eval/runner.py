@@ -31,6 +31,18 @@ from shopping_agent.tools.budget import BudgetExceeded, BudgetedTools
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def model_turns_for_tool_budget(max_calls: int) -> int:
+    """Derive the Claude ReAct turn budget from the public tool-call budget.
+
+    A rejected verification spends one model turn *and* one public tool call
+    (the refresh inside ``finish``). Aliasing 20 tool calls to a fixed 10 turns
+    could strand tool budget and end a run in ``recovery_exhausted``. Allow one
+    turn per permitted public call plus a final decision turn; the interpretation
+    call is counted separately in the trial's model-turn diagnostic.
+    """
+    return max_calls + 1
+
+
 def agent_input_for_task(task: TaskDefinition) -> AgentInput:
     """NL surface gets original_text only; structured keeps constraints + ranking."""
     if task.agent_surface == "nl":
@@ -69,7 +81,10 @@ def agent_metadata(agent):
     }
 
 
-def metadata(max_calls: int, seconds: float, agent_name: str = "rules") -> dict:
+def metadata(
+    max_calls: int, seconds: float, agent_name: str = "rules",
+    max_turns: int | None = None,
+) -> dict:
     source = hashlib.sha256()
     for path in sorted((ROOT / "src").rglob("*.py")):
         source.update(str(path.relative_to(ROOT)).encode())
@@ -86,6 +101,10 @@ def metadata(max_calls: int, seconds: float, agent_name: str = "rules") -> dict:
         "runner": "evaluation",
         "baseline": agent_name,
         "max_tool_calls": max_calls,
+        "max_model_turns": (
+            max_turns if max_turns is not None
+            else model_turns_for_tool_budget(max_calls)
+        ),
         "timeout_seconds": seconds,
         "python": platform.python_version(),
         "packages": {name: version(name) for name in ("fastapi", "pydantic", "httpx", "requests", "starlette")},
@@ -93,7 +112,7 @@ def metadata(max_calls: int, seconds: float, agent_name: str = "rules") -> dict:
     }
 
 
-def select_agent(agent=None, agent_name: str = "rules"):
+def select_agent(agent=None, agent_name: str = "rules", max_turns: int | None = None):
     if agent is not None:
         if isinstance(agent, RulesAgent):
             return agent, "rules"
@@ -101,7 +120,8 @@ def select_agent(agent=None, agent_name: str = "rules"):
             return agent, agent.condition
         return agent, "claude" if isinstance(agent, ClaudeAgent) else type(agent).__name__
     if agent_name == "claude":
-        return ClaudeAgent(), "claude"
+        return (ClaudeAgent(max_turns=max_turns) if max_turns is not None
+                else ClaudeAgent()), "claude"
     if agent_name == "rules":
         return RulesAgent(), "rules"
     if agent_name in CONDITIONS:
@@ -171,13 +191,16 @@ def run_trial(
     seconds: float = 60,
     agent=None,
     on_trace=None,
+    max_turns: int | None = None,
 ) -> TrialResult:
     """Worker core; suite's parent process supplies the noncooperative deadline."""
     from starlette.testclient import TestClient
 
     create_app, store = _build_store(catalog, task)
     selected_agent, agent_name = validate_experiment(task=task, agent=agent)
-    config = metadata(max_calls, seconds, agent_name)
+    config = metadata(max_calls, seconds, agent_name, max_turns)
+    if getattr(selected_agent, "max_turns", None) is not None:
+        config["max_model_turns"] = selected_agent.max_turns
     config["agent"] = agent_metadata(selected_agent)
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
@@ -209,6 +232,8 @@ def run_trial(
             output = AgentOutput(response_text="Trial failed.", termination_reason="unrecoverable_failure")
 
         duration = monotonic() - start
+        if hasattr(selected_agent, "model_turns"):
+            config["model_turns"] = selected_agent.model_turns
         snapshot = store.snapshot()
         success, satisfied, total = score(task, output, snapshot)
 
@@ -249,14 +274,17 @@ def run_trial(
         )
 
 
-def _worker(send, catalog, task, trial_number, max_calls, seconds, agent):
+def _worker(send, catalog, task, trial_number, max_calls, seconds, agent, max_turns=None):
     try:
         send.send(("started", None))
 
         def on_trace(event):
             send.send(("trace", event.model_dump(mode="json")))
 
-        result = run_trial(catalog, task, trial_number, max_calls, seconds, agent, on_trace)
+        result = run_trial(
+            catalog, task, trial_number, max_calls, seconds, agent, on_trace,
+            max_turns=max_turns,
+        )
         send.send(("result", result.model_dump(mode="json")))
 
     except Exception as exc:
@@ -273,6 +301,7 @@ def isolated_trial(
     max_calls: int = 20,
     seconds: float = 60,
     agent=None,
+    max_turns: int | None = None,
 ) -> TrialResult:
     if max_calls < 1 or seconds <= 0:
         raise ValueError("budgets must be positive")
@@ -283,8 +312,11 @@ def isolated_trial(
     process = context.Process(
         target=_worker,
         args=(send, catalog, task, trial_number, max_calls, seconds, selected_agent),
+        kwargs={"max_turns": max_turns},
     )
-    config = metadata(max_calls, seconds, selected_name)
+    config = metadata(max_calls, seconds, selected_name, max_turns)
+    if getattr(selected_agent, "max_turns", None) is not None:
+        config["max_model_turns"] = selected_agent.max_turns
     config["agent"] = agent_metadata(selected_agent)
     config["agent_surface"] = task.agent_surface
     config["task_sha256"] = hashlib.sha256(task.model_dump_json().encode()).hexdigest()
@@ -369,6 +401,7 @@ def run_suite(
     agent_name: str = "rules",
     seeds: list[int] | None = None,
     on_result=None,
+    max_turns: int | None = None,
 ) -> list[TrialResult]:
     if seeds is None:
         if repetitions < 1:
@@ -378,6 +411,10 @@ def run_suite(
         raise ValueError("seeds must not be empty")
 
     validate_experiment(tasks=tasks, agent_name=agent_name)
+    effective_turns = (
+        max_turns if max_turns is not None
+        else model_turns_for_tool_budget(max_calls)
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     results: list[TrialResult] = []
 
@@ -389,8 +426,11 @@ def run_suite(
             rng.shuffle(order)
 
             for position, task_id in enumerate(order):
-                agent, _ = select_agent(agent_name=agent_name)
-                result = isolated_trial(catalog, tasks[task_id], trial_number, max_calls, seconds, agent)
+                agent, _ = select_agent(agent_name=agent_name, max_turns=effective_turns)
+                result = isolated_trial(
+                    catalog, tasks[task_id], trial_number, max_calls, seconds, agent,
+                    max_turns=effective_turns,
+                )
                 result.run_metadata.update(
                     seed=trial_seed,
                     seeds=list(seeds),

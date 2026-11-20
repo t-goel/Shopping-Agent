@@ -83,9 +83,16 @@ def test_missing_explanation_facts_leave_the_rate_null():
     assert summary["unsupported_claim_rate"] is None
     assert summary["assessable_prose_claims"] == 0
 
+    # The compact report uses the verifier's structured claims, not a prose regex:
+    # contradictory prose alone cannot relabel supported structured evidence.
     record.response_text = "Ridge Rain Shell is $40."
     report = summarize([record])
-    assert report["overall"]["unsupported_claim_rate"] == 1
+    assert report["overall"]["unsupported_claim_rate"] == 0
+    contradicted = record.model_copy(deep=True)
+    contradicted.evidence = [
+        item.model_copy(update={"status": "contradicts"}) for item in record.evidence
+    ]
+    assert summarize([contradicted])["overall"]["unsupported_claim_rate"] == 1
     assert "unsupported-claim rate" in __import__(
         "shopping_agent.eval.report", fromlist=["markdown_report"]
     ).markdown_report([record]).casefold()

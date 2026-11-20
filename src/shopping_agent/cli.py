@@ -76,6 +76,7 @@ def run_comparison(args, parser):
             seeds=args.seeds,
             max_calls=args.max_calls,
             seconds=args.timeout,
+            max_turns=args.max_turns,
         )
         paths[condition] = path
 
@@ -123,6 +124,10 @@ def main(argv=None):
         help="comma-separated per-trial seeds (e.g. 1,2,3); overrides --seed/--repetitions",
     )
     run.add_argument("--max-calls", type=positive_int, default=20)
+    run.add_argument(
+        "--max-turns", type=positive_int, default=None,
+        help="Claude ReAct model-turn budget; defaults to --max-calls + 1",
+    )
     run.add_argument("--timeout", type=positive_seconds, default=60)
     run.add_argument(
         "--agent", choices=("rules", "claude") + CONDITIONS, default="rules",
@@ -148,6 +153,10 @@ def main(argv=None):
     compare_cmd.add_argument("--seeds", type=seed_list, default=[1, 2, 3])
     compare_cmd.add_argument("--conditions", default=",".join(CONDITIONS))
     compare_cmd.add_argument("--max-calls", type=positive_int, default=20)
+    compare_cmd.add_argument(
+        "--max-turns", type=positive_int, default=None,
+        help="Claude ReAct model-turn budget; defaults to --max-calls + 1",
+    )
     compare_cmd.add_argument("--timeout", type=positive_seconds, default=60)
     compare_cmd.add_argument("--json", action="store_true", help="Emit machine-readable JSON summary")
     args = parser.parse_args(argv)
@@ -165,6 +174,7 @@ def main(argv=None):
             catalog, tasks, args.output, args.repetitions, args.seed,
             args.max_calls, args.timeout, args.agent,
             seeds=args.seeds,
+            max_turns=args.max_turns,
             on_result=None if args.json else print_trial_line,
         )
     else:

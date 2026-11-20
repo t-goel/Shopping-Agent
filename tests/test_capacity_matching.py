@@ -19,6 +19,36 @@ def test_approximate_bounds_and_capacity_matches():
     assert not capacity_matches(35.1, 30.0, tolerance=5.0)
 
 
+def test_size_aliases_match_from_either_observed_spelling():
+    """Equivalent size spellings match regardless of which listing is inspected."""
+    def observation(size):
+        return ProductObservation(
+            store_id="store",
+            source_url="http://store/p/shoe",
+            observed_at="2026-11-17T00:00:00Z",
+            product=Product(
+                product_id="shoe",
+                title="Shoe",
+                description="Shoe",
+                category="footwear",
+                price=50.0,
+                stock=5,
+                seller="Seller",
+                attributes={"size": size},
+            ),
+        )
+
+    canonical = Constraint(attribute="size", operator="eq", value="9")
+    provider_style = Constraint(attribute="size", operator="eq", value="US 9 men's")
+    letter = Constraint(attribute="size", operator="eq", value="medium")
+
+    assert matches(observation("9"), provider_style)
+    assert matches(observation("US 9 men's"), canonical)
+    assert matches(observation("M"), letter)
+    assert matches(observation("medium"), Constraint(attribute="size", operator="eq", value="M"))
+    assert not matches(observation("S"), letter)
+
+
 def test_matches_with_constraint_tolerance():
     product_28l = ProductObservation(
         store_id="test-store",

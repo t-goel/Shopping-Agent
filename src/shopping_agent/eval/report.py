@@ -9,7 +9,6 @@ from collections import Counter
 from statistics import median
 
 from shopping_agent.contracts import TrialResult
-from shopping_agent.eval.prose_claims import unsupported_claim_rate
 
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -48,6 +47,25 @@ def _condition_parts(records: list[TrialResult]):
     return agents, concrete_surfaces
 
 
+def structured_unsupported_claim_rate(records: list[TrialResult]) -> float | None:
+    """Contradicted share of structured claims recorded in trial evidence.
+
+    Claims are built by the agent at purchase time and checked by the verifier
+    against the refreshed listing. This avoids the title-dependent prose regex:
+    only facts with a known support/contradict outcome enter the denominator.
+    """
+    supports = contradicts = 0
+    for record in records:
+        for evidence in record.evidence:
+            status = getattr(evidence, "status", None)
+            if status == "supports":
+                supports += 1
+            elif status == "contradicts":
+                contradicts += 1
+    assessed = supports + contradicts
+    return contradicts / assessed if assessed else None
+
+
 def summarize(records: list[TrialResult]):
     # Missing agent_surface is compatible with a single concrete surface (legacy JSONL).
     agents, concrete_surfaces = _condition_parts(records)
@@ -69,8 +87,19 @@ def summarize(records: list[TrialResult]):
             "median_duration_seconds": median(times) if times else None,
             "p95_duration_seconds": times[math.ceil(.95 * len(times)) - 1] if times else None,
             "median_tool_calls": median(r.tool_calls for r in rows) if rows else None,
+            "max_model_turns": max(
+                (r.run_metadata["max_model_turns"] for r in rows
+                 if r.run_metadata.get("max_model_turns") is not None),
+                default=None,
+            ),
+            "model_turns": (
+                sum(r.run_metadata["model_turns"] for r in rows)
+                if rows and all(r.run_metadata.get("model_turns") is not None for r in rows)
+                else None
+            ),
             "failure_categories": dict(Counter(failure_category(r) for r in rows if not r.is_successful)),
-            "unsupported_claim_rate": unsupported_claim_rate(rows), "human_rating": None,
+            "unsupported_claim_rate": structured_unsupported_claim_rate(rows),
+            "human_rating": None,
             "model_cost_usd": (sum(r.cost_usd for r in rows)
                                if rows and all(r.cost_usd is not None for r in rows) else None),
             "input_tokens": sum(r.input_tokens for r in rows) if input_ok else None,

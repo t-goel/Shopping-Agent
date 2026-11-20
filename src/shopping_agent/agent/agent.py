@@ -10,17 +10,20 @@ import requests
 from pydantic import ValidationError
 
 from shopping_agent.agent.request_parser import parse_request
-from shopping_agent.comparison import canonicalize_size, coerce_numeric
+from shopping_agent.agent.rules import rank
+from shopping_agent.comparison import canonical_size, canonicalize_size, coerce_numeric
 from shopping_agent.contracts import (
     CartSelection,
     ClaudeAnswer,
     Constraint,
+    Operator,
     RequestInterpretation,
     SearchInput,
     ShoppingRequest,
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
+from shopping_agent.tools.budget import BudgetExceeded
 from shopping_agent.verifier import (
     eligible,
     field_value,
@@ -218,6 +221,8 @@ class Agent:
         self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-haiku-5-5")
         self.effort = effort or os.environ.get("ANTHROPIC_EFFORT", "high")
         self.max_turns = max_turns
+        # Provider calls actually made this trial: interpretation + every ReAct turn.
+        self.model_turns = 0
         self.url = "https://api.anthropic.com/v1/messages"
 
     def interpret_query(self, query: str) -> RequestInterpretation:
@@ -234,6 +239,8 @@ class Agent:
             req, rule = parse_request(query)
             return RequestInterpretation(request=req, ranking_rule=rule)
 
+        # The live interpretation call is a model turn; the test-key parser is not.
+        self.model_turns += 1
         response = self.ask_json(
             system=INTERPRETATION_PROMPT,
             content=query,
@@ -251,10 +258,12 @@ class Agent:
         self.input_tokens = None
         self.output_tokens = None
         self._missing_usage = set()
+        self.model_turns = 0
         if inputs.request.clarification_needed:
             return AgentOutput(
                 response_text=inputs.request.clarification_needed,
                 termination_reason="clarification_needed",
+                diagnostics={"model_turns": self.model_turns},
             )
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -274,6 +283,12 @@ class Agent:
             clarification_needed = inputs.request.clarification_needed
             preferences = list(inputs.request.preferences)
 
+        # Only treat a capacity eq as approximate when the request actually says so.
+        approximate_capacity = bool(re.search(
+            r"~|approx(?:imately)?\b|about\b|around\b|roughly\b",
+            inputs.request.original_text, re.IGNORECASE,
+        ))
+
         diagnostics = {
             "extracted_constraints": [c.model_dump(mode="json") for c in active_constraints],
             "interpreted_ranking_rule": active_ranking_rule,
@@ -281,6 +296,7 @@ class Agent:
 
         if clarification_needed:
             diagnostics["model_status"] = "clarification_needed"
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=clarification_needed,
                 termination_reason="clarification_needed",
@@ -304,6 +320,8 @@ class Agent:
         rejections: list[VerificationRejection] = []
 
         for turn in range(self.max_turns):
+            # Count every ReAct model call, including subclassed ask_claude stubs.
+            self.model_turns += 1
             answer = self.ask_claude(messages)
 
             if answer.get("stop_reason") != "tool_use":
@@ -334,19 +352,25 @@ class Agent:
                     products,
                     active_constraints=active_constraints,
                     active_ranking_rule=active_ranking_rule,
+                    approximate_capacity=approximate_capacity,
                     is_repair=bool(rejections),
                 )
                 if isinstance(outcome, VerificationRejection):
                     rejections.append(outcome)
                     if answer.get("content"):
                         messages.append({"role": "assistant", "content": answer["content"]})
+                    turns_remaining = self.max_turns - turn - 1
+                    if turns_remaining <= 0:
+                        # No future turn can consume another observation. Stop asking
+                        # the model and use a tool-only deterministic runner-up instead.
+                        break
                     messages.append({
                         "role": "user",
                         "content": self._verification_observation(
                             outcome,
                             products,
                             rejected_ids=[item.product_id for item in rejections],
-                            turns_remaining=self.max_turns - turn - 1,
+                            turns_remaining=turns_remaining,
                         ),
                     })
                     continue
@@ -357,6 +381,7 @@ class Agent:
                     ]
                     if outcome.termination_reason == "completed":
                         outcome.diagnostics["recovered_after_rejection"] = True
+                outcome.diagnostics["model_turns"] = self.model_turns
                 last_response_error = None
                 return outcome
 
@@ -392,13 +417,29 @@ class Agent:
             messages.append({"role": "user", "content": tool_results})
 
         if rejections:
-            # The gate rejected every proposed product and no turn remains to retry.
+            # The gate rejected every proposed product and no model turn remains to
+            # repair it. Fall back to a deterministic re-rank (tool calls only) so the
+            # remaining public tool budget cannot be stranded by turn exhaustion.
             last = rejections[-1]
             diagnostics = dict(last.diagnostics)
             diagnostics["verification_rejections"] = [
                 rejection.as_dict() for rejection in rejections
             ]
+            fallback = self._deterministic_pick(
+                products, rejections, tools, active_constraints, active_ranking_rule,
+                diagnostics, approximate_capacity=approximate_capacity,
+            )
+            if fallback is not None:
+                fallback.diagnostics["verification_rejections"] = [
+                    rejection.as_dict() for rejection in rejections
+                ]
+                fallback.diagnostics["recovered_by_deterministic_fallback"] = True
+                fallback.diagnostics["model_turns"] = self.model_turns
+                return fallback
+            diagnostics["model_status"] = "no_valid_product"
             diagnostics["recovery_exhausted"] = True
+            diagnostics["deterministic_fallback_exhausted"] = True
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=(
                     "The selected product failed final verification after a catalog change, "
@@ -411,6 +452,161 @@ class Agent:
         if last_response_error is not None:
             raise last_response_error
         raise RuntimeError("Claude used too many turns")
+
+    @staticmethod
+    def _candidate_observations(products: dict) -> list:
+        """Unique observed products, keyed by store listing."""
+        seen = set()
+        candidates = []
+        for observation in products.values():
+            key = (observation.store_id, observation.product.product_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(observation)
+        return candidates
+
+    @staticmethod
+    def _clarification_hits_unconstrained_attribute(text, constraints, listings) -> bool:
+        """True when the question asks about an attribute no hard constraint covers.
+
+        A clarification about such an attribute cannot be answered from the
+        request alone, so coercing it into a purchase would guess at an
+        unspecified user preference. Questions about attributes the request
+        already constrains are candidates for the false-abstention fallback.
+        """
+        covered = {
+            item.attribute.casefold().replace("_", " ")
+            for item in constraints if item.hard
+        }
+        lowered = (text or "").casefold()
+        attributes = set()
+        for observation in listings:
+            attributes.update(observation.product.attributes)
+        for attribute in attributes:
+            token = str(attribute).casefold().replace("_", " ")
+            root = token.split(" ", 1)[0]
+            if not root or token in covered or root in covered:
+                continue
+            if re.search(rf"\b{re.escape(root)}", lowered):
+                return True
+        return False
+
+    @staticmethod
+    def _remaining_tool_calls(tools) -> int | None:
+        """Public tool calls still available, or None for unbudgeted tools."""
+        max_calls = getattr(tools, "max_calls", None)
+        trace = getattr(tools, "trace", None)
+        if isinstance(max_calls, int) and isinstance(trace, (list, tuple)):
+            return max(0, max_calls - len(trace))
+        return None
+
+    def _deterministic_pick(
+        self, products, rejections, tools, constraints, rule, diagnostics,
+        approximate_capacity: bool = False,
+    ):
+        """Re-rank observed candidates and buy the best eligible runner-up.
+
+        Mirrors ``RulesAgent``'s guarded re-rank: drop the rejected product,
+        re-rank the remaining observations, refresh the winner and re-check
+        eligibility and stock before the cart write. It spends public tool
+        calls but no model turn, so verification cannot deadlock a run that
+        still has tool budget. Returns None when no runner-up survives.
+        """
+        rejected_ids = {item.product_id for item in rejections}
+        candidates = [
+            observation
+            for observation in self._candidate_observations(products)
+            if observation.product.product_id not in rejected_ids
+        ]
+        if not candidates:
+            return None
+        remaining = self._remaining_tool_calls(tools)
+        if remaining is not None and remaining < 3:
+            return None
+
+        normalized = self.normalize_constraints(
+            constraints or [], candidates, approximate_capacity
+        )
+        current = rank(
+            [item for item in candidates if eligible(item, normalized)], rule
+        )
+        for candidate in current:
+            remaining = self._remaining_tool_calls(tools)
+            if remaining is not None and remaining < 3:
+                break
+            try:
+                latest = tools.get_listing(
+                    candidate.product.product_id,
+                    store_id=candidate.store_id,
+                    listing_id=candidate.listing_id,
+                )
+            except ToolError as exc:
+                if exc.status_code == 404:
+                    continue
+                raise
+            except BudgetExceeded:
+                return None
+            if not eligible(latest, normalized):
+                continue
+            try:
+                cart = tools.inspect_cart()
+                if cart.items:
+                    return None
+                selection = CartSelection(
+                    product_id=latest.product.product_id,
+                    quantity=1,
+                    store_id=latest.store_id,
+                    listing_id=latest.listing_id,
+                )
+                cart = tools.add_to_cart(selection)
+            except ToolError as exc:
+                if exc.status_code == 409:
+                    continue
+                raise
+            except BudgetExceeded:
+                return None
+            product = latest.product
+            if (
+                len(cart.items) != 1
+                or cart.items[0].product_id != product.product_id
+                or cart.items[0].quantity != 1
+                or not cart.items[0].in_stock
+                or cart.items[0].unit_price != product.price
+            ):
+                return None
+
+            claims = [Claim(
+                claim_id=f"{product.product_id}:price",
+                product_id=product.product_id,
+                field="price",
+                value=product.price,
+            )]
+            fallback_diagnostics = dict(diagnostics)
+            # Keep model_status as the model's own decision; the fallback is
+            # distinguished by termination_reason and selected_by.
+            fallback_diagnostics["fallback_status"] = "completed"
+            fallback_diagnostics["listing_id"] = latest.listing_id
+            fallback_diagnostics["store_id"] = latest.store_id
+            fallback_diagnostics["selected_by"] = "deterministic_fallback"
+            fallback_diagnostics["model_turns"] = self.model_turns
+            return AgentOutput(
+                selected_product_ids=[product.product_id],
+                selected_listing_ids=[latest.listing_id] if latest.listing_id else [],
+                response_text=(
+                    f"Selected {product.title} for ${product.price:.2f} using the "
+                    + (
+                        "best remaining in-stock candidate after final verification failed."
+                        if rejections else
+                        "best in-stock match for the interpreted request."
+                    )
+                ),
+                claims=claims,
+                evidence=verify_claims(latest, claims),
+                termination_reason="completed",
+                diagnostics=fallback_diagnostics,
+            )
+        return None
 
     @staticmethod
     def _verification_observation(
@@ -619,8 +815,15 @@ class Agent:
         return text
 
     @staticmethod
-    def normalize_constraints(constraints, listings):
-        """Coerce constraint value types to match observed listing fields (verification only)."""
+    def normalize_constraints(constraints, listings, approximate_capacity: bool = False):
+        """Coerce live interpreter values to the types observed in listings.
+
+        Handles booleans/numbers given as strings plus provider-style sizes
+        (``medium``, ``9``, ``US 9 men's``). A tolerance is added to a capacity
+        ``eq`` only when the request actually describes an approximate amount.
+        Only called at verification time; the agent's declared constraints are
+        never rewritten for the model.
+        """
         normalized = []
         for constraint in constraints:
             observed = next(
@@ -668,6 +871,17 @@ class Agent:
                 if str(value) == observed or (isinstance(value, float) and value.is_integer() and str(int(value)) == observed):
                     value = observed
 
+            if (
+                approximate_capacity
+                and constraint.attribute == "capacity_liters"
+                and constraint.operator == Operator.EQ
+                and isinstance(observed, (int, float))
+                and not isinstance(observed, bool)
+            ):
+                # "~30 liters" may be emitted as capacity_liters eq 30; only
+                # relax it when the request signalled an approximation.
+                tolerance = 5.0 if tolerance is None else tolerance
+
             update_dict = {"value": value}
             if tolerance is not None and hasattr(constraint, "tolerance"):
                 update_dict["tolerance"] = tolerance
@@ -683,7 +897,8 @@ class Agent:
         products,
         active_constraints=None,
         active_ranking_rule=None,
-        is_repair=False,
+        approximate_capacity: bool = False,
+        is_repair: bool = False,
     ):
         content = provider_answer.get("content", [])
         stop_reason = provider_answer.get("stop_reason")
@@ -700,6 +915,41 @@ class Agent:
             diagnostics["model_constraints"] = decision["constraints"]
 
         if decision["status"] == "clarification_needed":
+            # A clarification loop is a false abstention when the products already
+            # observed contain an eligible, in-stock match for the interpreted
+            # constraints. Downgrade the ask into a deterministic product pick.
+            candidates = self._candidate_observations(products)
+            normalized = self.normalize_constraints(
+                active_constraints or [], candidates, approximate_capacity
+            )
+            valid = [item for item in candidates if eligible(item, normalized)]
+            if valid:
+                diagnostics["false_abstention_candidates"] = [
+                    {
+                        "product_id": item.product.product_id,
+                        "listing_id": item.listing_id,
+                        "store_id": item.store_id,
+                    }
+                    for item in rank(valid, active_ranking_rule)
+                ]
+                if self._clarification_hits_unconstrained_attribute(
+                    response_text, active_constraints or [], candidates
+                ):
+                    # The question asks about an attribute the request never
+                    # constrained: answering it requires the user, not a guess.
+                    diagnostics["clarification_preserved_for_unconstrained_attribute"] = True
+                else:
+                    fallback = self._deterministic_pick(
+                        products, [], tools, active_constraints, active_ranking_rule,
+                        diagnostics, approximate_capacity=approximate_capacity,
+                    )
+                    if fallback is not None:
+                        fallback.diagnostics["coerced_from_clarification"] = True
+                        fallback.diagnostics["false_abstention_candidates"] = diagnostics[
+                            "false_abstention_candidates"
+                        ]
+                        return fallback
+            diagnostics["model_turns"] = self.model_turns
             return AgentOutput(
                 response_text=response_text,
                 termination_reason="clarification_needed",
@@ -766,12 +1016,18 @@ class Agent:
             if c1 is None or c2 is None:
                 return c1 != c2
             def key(c):
+                val = c.value
+                if c.attribute == "size":
+                    val = canonicalize_size(val)
+                elif isinstance(val, (int, float)) and not isinstance(val, bool):
+                    val = int(val) if float(val).is_integer() else float(val)
+                tol = getattr(c, "tolerance", None)
                 return (
                     c.attribute,
                     str(c.operator),
-                    str(c.value),
+                    str(val),
                     bool(c.hard),
-                    str(getattr(c, "tolerance", "")),
+                    str(tol if tol is not None else ""),
                 )
             return sorted([key(c) for c in c1]) != sorted([key(c) for c in c2])
 
@@ -837,7 +1093,9 @@ class Agent:
         products[product_id] = product
         if product.listing_id:
             products[product.listing_id] = product
-        constraints = self.normalize_constraints(constraints, [product])
+        constraints = self.normalize_constraints(
+            constraints, [product], approximate_capacity
+        )
         diagnostics["interpreted_constraints"] = [row.model_dump(mode="json") for row in constraints]
         diagnostics["eligible_product_ids"] = (
             [product_id] if eligible(product, constraints) else []

@@ -326,3 +326,54 @@ def test_repair_differ_handles_heterogeneous_types():
         is_repair=True,
     )
     assert outcome.termination_reason == "completed"
+
+
+def test_repair_differ_spatial_ordering_and_equivalence():
+    """Verify spatial ordering of constraints does not falsely trigger differing constraints."""
+    agent = Agent(api_key="test-key")
+    obs = _make_obs("prod-1", "jackets", size="M", price=85.0, waterproof=True, stock=4)
+
+    mock_tools = MagicMock()
+    mock_tools.get_listing.return_value = obs
+    mock_tools.inspect_cart.return_value = MagicMock(items=[])
+    mock_tools.add_to_cart.return_value = MagicMock(
+        items=[MagicMock(product_id="prod-1", quantity=1, in_stock=True, unit_price=85.0)]
+    )
+
+    captured_constraints = [
+        Constraint(attribute="category", operator=Operator.EQ, value="jackets", hard=True),
+        Constraint(attribute="waterproof", operator=Operator.EQ, value=True, hard=True),
+        Constraint(attribute="price", operator=Operator.LTE, value=100.0, hard=True),
+    ]
+
+    # Model returns the exact same constraints, but permuted in spatial order
+    permuted_decision = {
+        "status": "completed",
+        "product_id": "prod-1",
+        "response": "Selected prod-1.",
+        "constraints": [
+            {"attribute": "price", "operator": "lte", "value": 100.0, "hard": True},
+            {"attribute": "category", "operator": "eq", "value": "jackets", "hard": True},
+            {"attribute": "waterproof", "operator": "eq", "value": True, "hard": True},
+        ],
+        "ranking_rule": "lowest_price",
+    }
+    answer = {"content": [{"type": "text", "text": json.dumps(permuted_decision)}], "stop_reason": "end_turn"}
+    inputs = AgentInput(
+        request=ShoppingRequest(original_text="Need a waterproof jacket, max 100."),
+        ranking_rule="lowest_price",
+    )
+
+    outcome = agent.finish(
+        decision=permuted_decision,
+        provider_answer=answer,
+        inputs=inputs,
+        tools=mock_tools,
+        products={"prod-1": obs},
+        active_constraints=captured_constraints,
+        active_ranking_rule="lowest_price",
+        is_repair=True,
+    )
+    assert outcome.termination_reason == "completed"
+    assert outcome.selected_product_ids == ["prod-1"]
+
