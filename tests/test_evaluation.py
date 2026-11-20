@@ -8,14 +8,16 @@ from fastapi.testclient import TestClient
 
 from server.app import create_app
 from server.state import Store, load_examples
+from shopping_agent.agent.baselines import OfflineAgent
 from shopping_agent.agent.rules import RulesAgent, rank
 from shopping_agent.contracts import Constraint, Mutation, ProductObservation, SearchInput
+from shopping_agent.eval.metrics import claim_audit
 from shopping_agent.eval.report import summarize
 from shopping_agent.eval.runner import agent_input_for_task, isolated_trial, run_trial
 from shopping_agent.eval.scoring import score
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim
 from shopping_agent.tools.api import CatalogAPI, ToolError
-from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded
+from shopping_agent.tools.budget import BudgetedTools, BudgetExceeded, verification_scope
 from shopping_agent.verifier import (
     check_constraints,
     verification_failure_reason,
@@ -187,8 +189,9 @@ def test_cooperative_timeout_and_failure_denominator():
     assert report["overall"]["success_rate"] == .5
     assert report["overall"]["product_constraint_satisfaction"] == .5
     assert report["by_difficulty"]["hard"]["success_rate"] is None
-    # The completed rules explanation states the selected price; the aborted trial states none.
+    # The completed trial declares checkable claims; the aborted trial declares none.
     assert report["overall"]["unsupported_claim_rate"] == 0
+    assert report["overall"]["assessable_claims"] > 0
     assert report["by_task"]["cheapest_waterproof_jacket"]["unsupported_claim_rate"] == 0
     now = [0.0]
     tools = BudgetedTools(object(), seconds=1, clock=lambda: now[0])
@@ -309,3 +312,127 @@ def test_late_change_can_preserve_the_same_winner():
     assert result.selected_product_ids == ["ridge-shell"]
     assert result.tool_calls == 9  # list_stores probe + search + listing reads + cart
     assert result.claims[1]["value"] == 90
+
+
+def test_verification_calls_are_labelled_and_charged_once():
+    """The gate's reads and purchase are one budget charge each, not double counted."""
+    catalog, tasks = harness_examples()
+    gated = run_trial(catalog, tasks["cheapest_waterproof_jacket"], agent=OfflineAgent("full"))
+    assert gated.is_successful, gated.model_dump()
+    purposes = [row["purpose"] for row in gated.tool_trace]
+    # The gate refresh, its empty-cart check, and the purchase it verifies.
+    assert purposes.count("verification") == 3
+    assert len(gated.tool_trace) == gated.tool_calls
+    assert sum(summarize([gated])["overall"]["tool_calls_by_purpose"].values()) == gated.tool_calls
+
+    ablated = run_trial(catalog, tasks["cheapest_waterproof_jacket"], agent=OfflineAgent("no_verifier"))
+    assert ablated.is_successful, ablated.model_dump()
+    assert {row["purpose"] for row in ablated.tool_trace} == {"agent"}
+    # The gate costs exactly two calls more than the ablation of the same run.
+    assert gated.tool_calls == ablated.tool_calls + 2
+
+
+def test_tool_budget_charges_gate_calls_against_the_same_limit():
+    catalog, tasks = harness_examples()
+    with TestClient(create_app(Store(catalog, tasks))) as client:
+        tools = BudgetedTools(CatalogAPI(client), max_calls=2)
+        with verification_scope(tools):
+            tools.get_listing("ridge-shell")
+        tools.search(SearchInput(query="jackets"))
+        with pytest.raises(BudgetExceeded) as exc:
+            tools.inspect_cart()
+        assert exc.value.reason == "max_tool_calls_exceeded"
+        assert [row.purpose for row in tools.trace] == ["verification", "agent"]
+
+
+def test_verification_scope_is_a_noop_for_tools_without_attribution():
+    """A plain ShoppingTools still works inside the scope; it just keeps the default."""
+    with verification_scope(object()):
+        pass
+    with verification_scope(object(), enabled=False):
+        pass
+
+
+def test_agent_input_copies_keep_each_trial_independent():
+    _, tasks = harness_examples()
+    task = tasks["cheapest_waterproof_jacket"]
+    before = task.model_dump_json()
+    first = agent_input_for_task(task)
+    second = agent_input_for_task(task)
+    assert first.request is not second.request
+    first.request.constraints.clear()
+    first.request.original_text = "mutated"
+    assert second.request.constraints == task.request.constraints
+    assert task.model_dump_json() == before
+
+
+def test_each_trial_reads_its_own_copy_of_the_catalog():
+    catalog, tasks = harness_examples()
+    before = catalog.model_dump_json()
+    changed = run_trial(catalog, tasks["price_change"])
+    normal = run_trial(catalog, tasks["cheapest_waterproof_jacket"])
+    assert changed.final_state["products"]["ridge-shell"]["price"] == 109
+    assert normal.final_state["products"]["ridge-shell"]["price"] == 89
+    assert catalog.model_dump_json() == before
+
+
+def test_unsupported_claim_rate_follows_structured_claims_only():
+    catalog, tasks = harness_examples()
+    record = run_trial(catalog, tasks["cheapest_waterproof_jacket"])
+    assert record.claims  # The rules agent declares title and price.
+
+    contradicted = record.model_copy(deep=True)
+    contradicted.claims = [{**claim, "value": 40.0} if claim["field"] == "price" else claim
+                           for claim in record.claims]
+    report = summarize([contradicted])["overall"]
+    assert report["structured_claims"]["contradicts"] == 1
+    assert report["structured_claims"]["supports"] == 1
+    assert report["unsupported_claim_rate"] == 0.5
+    # The explanation prose is unchanged and still truthful, so the advisory rate stays 0.
+    assert report["prose_claim_contradiction_rate"] == 0
+
+    no_claims = record.model_copy(deep=True)
+    no_claims.claims = []
+    quiet = summarize([no_claims])["overall"]
+    assert quiet["unsupported_claim_rate"] is None
+    assert quiet["assessable_claims"] == 0
+
+
+def test_claims_are_audited_against_the_listing_the_trial_used():
+    """Multi-store snapshots keep price on the listing, not on the product row."""
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    record = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"])
+    assert record.is_successful, record.model_dump()
+    assert record.claims  # The rules agent declares title and price.
+
+    # The winning listing's price, not a sibling store's and not the product row.
+    listing_id = record.selected_listing_ids[0]
+    assert record.final_state["listings"][listing_id]["price"] == 89
+    audit = claim_audit(record)
+    statuses = {row["field"]: row["status"] for row in audit}
+    assert statuses == {"title": "supports", "price": "supports"}
+    assert {row["observed_value"] for row in audit if row["field"] == "price"} == {89}
+
+    report = summarize([record])["overall"]
+    assert report["assessable_claims"] == 2
+    assert report["unsupported_claim_rate"] == 0
+
+
+def test_claim_against_an_ambiguous_product_without_a_used_listing_stays_unknown():
+    """An unfilled claim cannot borrow a sibling store's row."""
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    record = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"])
+    compared = record.model_copy(deep=True)
+    compared.selected_listing_ids = []
+    compared.cart_items = []
+    compared.claims = [row for row in record.claims if row["field"] == "price"]
+    # Three stores list this product, so no single listing backs the claim.
+    listed_in = [key for key, row in compared.final_state["listings"].items()
+                 if row["product_id"] == "ridge-shell"]
+    assert len(listed_in) == 3
+    assert claim_audit(compared)[0]["status"] == "unknown"
+    assert summarize([compared])["overall"]["unsupported_claim_rate"] is None

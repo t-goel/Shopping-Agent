@@ -44,7 +44,11 @@ def model_turns_for_tool_budget(max_calls: int) -> int:
 
 
 def agent_input_for_task(task: TaskDefinition) -> AgentInput:
-    """NL surface gets original_text only; structured keeps constraints + ranking."""
+    """NL surface gets original_text only; structured keeps constraints + ranking.
+
+    Every call returns fresh objects, so an agent that mutates its input cannot
+    change the shared task or a sibling trial of another condition.
+    """
     if task.agent_surface == "nl":
         return AgentInput(
             request=ShoppingRequest(original_text=task.request.original_text),
@@ -172,11 +176,18 @@ def failure_record(task, trial_number, reason, duration, trace, error, config) -
 
 
 def _build_store(catalog: CatalogExample | IngestCatalog, task: TaskDefinition):
+    """Build a store for one trial from a private copy of the catalog.
+
+    The store already deep-copies its own state on reset, but it also keeps a
+    reference to the catalog it was handed. Copying here means a store bug, or a
+    future in-place mutation, cannot leak one condition's state into the next.
+    """
     create_app, Store, MultiStore, _, _ = load_store_modules()
-    if isinstance(catalog, IngestCatalog):
-        store = MultiStore(catalog, {task.task_id: task})
+    trial_catalog = catalog.model_copy(deep=True)
+    if isinstance(trial_catalog, IngestCatalog):
+        store = MultiStore(trial_catalog, {task.task_id: task})
     else:
-        store = Store(catalog, {task.task_id: task})
+        store = Store(trial_catalog, {task.task_id: task})
     store.reset(task.task_id)
     return create_app, store
 

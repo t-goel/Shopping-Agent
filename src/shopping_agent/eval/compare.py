@@ -26,6 +26,7 @@ COLUMNS = (
     ("median_duration_seconds", "Median seconds"),
     ("p95_duration_seconds", "p95 seconds"),
     ("evidence_trials", "Trials with claim evidence"),
+    ("verification_calls", "Verification calls"),
 )
 
 
@@ -68,6 +69,8 @@ def comparison(paths: dict[str, Path], *, protocol_note: str | None = None) -> d
             "median_duration_seconds": overall["median_duration_seconds"],
             "p95_duration_seconds": overall["p95_duration_seconds"],
             "evidence_trials": sum(bool(record.evidence) for record in records),
+            "tool_calls_by_purpose": overall["tool_calls_by_purpose"],
+            "unsupported_claim_rate": overall["unsupported_claim_rate"],
             "failure_categories": overall["failure_categories"],
             "termination_reasons": overall["termination_reasons"],
         }
@@ -103,14 +106,16 @@ def _seconds(value: float | None) -> str:
 
 def markdown_table(result: dict) -> str:
     lines = [
-        "| Condition | Successful / trials | Success rate | Median calls | Median seconds | p95 seconds | Trials with claim evidence |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Condition | Successful / trials | Success rate | Median calls | Median seconds | "
+        "p95 seconds | Trials with claim evidence | Verification calls |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in result["conditions"].values():
         lines.append(
             f"| {row['label']} | {row['successful']}/{row['trials']} | {_rate(row['success_rate'])} | "
             f"{row['median_tool_calls']} | {_seconds(row['median_duration_seconds'])} | "
-            f"{_seconds(row['p95_duration_seconds'])} | {row['evidence_trials']}/{row['trials']} |"
+            f"{_seconds(row['p95_duration_seconds'])} | {row['evidence_trials']}/{row['trials']} | "
+            f"{row['tool_calls_by_purpose'].get('verification', 0)} |"
         )
     return "\n".join(lines)
 
@@ -126,6 +131,7 @@ def csv_text(result: dict) -> str:
             "median_duration_seconds": row["median_duration_seconds"],
             "p95_duration_seconds": row["p95_duration_seconds"],
             "evidence_trials": f"{row['evidence_trials']}/{row['trials']}",
+            "verification_calls": row["tool_calls_by_purpose"].get("verification", 0),
         }
         lines.append(",".join(str(values[key]) for key, _ in COLUMNS))
     return "\n".join(lines) + "\n"

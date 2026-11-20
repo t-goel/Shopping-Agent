@@ -6,7 +6,7 @@ from shopping_agent.eval.audit import audit_records, audit_trial
 from shopping_agent.eval.prose_claims import (
     audit_prose_claims,
     extract_prose_claims,
-    unsupported_claim_rate,
+    prose_claim_contradiction_rate,
 )
 from shopping_agent.eval.report import summarize
 from shopping_agent.eval.runner import run_trial
@@ -51,14 +51,14 @@ def test_prose_audit_uses_latest_get_listing_not_search_or_title_echo():
     assert by_field["stock"]["status"] == "supports"
     assert by_field["rating"]["status"] == "supports"
     assert by_field["waterproof"]["status"] == "supports"
-    assert audit["unsupported_claim_rate"] == 0
+    assert audit["prose_claim_contradiction_rate"] == 0
 
     record.response_text = "Ridge Rain Shell costs $40 and is out of stock."
     contradicted = audit_prose_claims(record)
     statuses = {item["field"]: item["status"] for item in contradicted["prose_claims"]}
     assert statuses["price"] == "contradicts"
     assert statuses["stock_status"] == "contradicts"
-    assert contradicted["unsupported_claim_rate"] == 1
+    assert contradicted["prose_claim_contradiction_rate"] == 1
 
 
 def test_stale_search_row_does_not_support_a_later_listing():
@@ -78,24 +78,20 @@ def test_missing_explanation_facts_leave_the_rate_null():
     catalog, tasks = load_examples(tasks_path=root / "data/tasks/harness")
     record = run_trial(catalog, tasks["cheapest_waterproof_jacket"])
     record.response_text = "Nothing in the catalog fits."
-    assert unsupported_claim_rate([record]) is None
+    assert prose_claim_contradiction_rate([record]) is None
     summary = audit_records([record])["summary"]
-    assert summary["unsupported_claim_rate"] is None
+    assert summary["prose_claim_contradiction_rate"] is None
     assert summary["assessable_prose_claims"] == 0
 
     # The compact report uses the verifier's structured claims, not a prose regex:
     # contradictory prose alone cannot relabel supported structured evidence.
     record.response_text = "Ridge Rain Shell is $40."
     report = summarize([record])
+    assert report["overall"]["prose_claim_contradiction_rate"] == 1
+    # Structured evidence is still truthful; a prose regex alone cannot relabel it.
     assert report["overall"]["unsupported_claim_rate"] == 0
-    contradicted = record.model_copy(deep=True)
-    contradicted.evidence = [
-        item.model_copy(update={"status": "contradicts"}) for item in record.evidence
-    ]
-    assert summarize([contradicted])["overall"]["unsupported_claim_rate"] == 1
-    assert "unsupported-claim rate" in __import__(
-        "shopping_agent.eval.report", fromlist=["markdown_report"]
-    ).markdown_report([record]).casefold()
+    markdown = __import__("shopping_agent.eval.report", fromlist=["markdown_report"]).markdown_report([record])
+    assert "prose claim contradiction rate" in markdown.casefold()
 
 
 def test_audit_trial_keeps_structured_claims_and_adds_prose():
@@ -109,7 +105,7 @@ def test_audit_trial_keeps_structured_claims_and_adds_prose():
     prose = next(item for item in result["prose_claims"] if item["product_id"] == "summit-shell")
     assert prose["status"] == "supports"
     assert record.model_dump_json() == before
-    assert audit_records([record])["audit_version"] == "prose-observations-v1"
+    assert audit_records([record])["audit_version"] == "structured-claims-v2"
 
 
 def test_products_are_real_contracts():

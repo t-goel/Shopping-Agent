@@ -67,6 +67,11 @@ def test_verification_gate_is_the_difference_between_full_and_ablation():
     assert full.evidence and not ablated.evidence
     assert full.prompt_id != ablated.prompt_id
     assert full.tool_calls > ablated.tool_calls
+    # Only the gated condition spends calls on verification, and each one is one charge.
+    assert "verification" in {row["purpose"] for row in full.tool_trace}
+    assert {row["purpose"] for row in ablated.tool_trace} == {"agent"}
+    assert len(full.tool_trace) == full.tool_calls
+    assert len(ablated.tool_trace) == ablated.tool_calls
 
 
 def test_select_agent_accepts_all_conditions():
