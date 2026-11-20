@@ -5,6 +5,7 @@ from shopping_agent.eval.report import (
     common_failure_issue,
     format_run_summary,
     format_trial_line,
+    summarize,
 )
 
 
@@ -72,6 +73,19 @@ def test_format_run_summary_score_and_common_failure():
     assert "Score: 1/4 (25%)" in text
     assert "Common failure (2/3 failed): JSONDecodeError: Expecting value: line 1 column 1 (char 0)" in text
     assert common_failure_issue(records)[1] == 2
+
+
+def test_duration_percentiles_are_taken_from_trial_durations():
+    records = [
+        trial(duration_seconds=1.0, tool_calls=9),
+        trial(duration_seconds=2.0, tool_calls=1),
+        trial(duration_seconds=3.0, tool_calls=1),
+        trial(duration_seconds=4.0, tool_calls=1),
+    ]
+    overall = summarize(records)["overall"]
+    assert overall["median_duration_seconds"] == 2.5
+    assert overall["p95_duration_seconds"] == 4.0
+    assert overall["median_tool_calls"] == 1
 
 
 def test_all_pass_summary():

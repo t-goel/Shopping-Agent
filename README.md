@@ -40,9 +40,14 @@ py -m pytest -q
 ```
 
 Defaults: three repetitions, seeded shuffled task order (`498`), twenty public tool calls,
-60 seconds per worker trial. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
-`--max-calls`, and `--timeout` are configurable. Choose a new output path for each run;
-existing records are never silently overwritten. The CLI runs the existing FastAPI
+60 seconds per worker trial. The Claude agent's ReAct loop gets one model turn per permitted
+public tool call plus a final decision turn (21 turns by default); this is derived from
+`--max-calls` and can be overridden with `--max-turns`. Verification rejections spend a
+public tool call and a model turn, and a deterministic runner-up retry uses only tool calls
+so a rejection cannot strand the remaining tool budget. Actual and maximum model turns are
+recorded in each trial's metadata. `--tasks`, `--catalog`, `--repetitions`, `--seed`,
+`--max-calls`, `--max-turns`, and `--timeout` are configurable. Choose a new output path
+for each run; existing records are never silently overwritten. The CLI runs the existing FastAPI
 routes in-process inside isolated workers, so no storefront/server launch or model
 key is required. Run from this checkout; the mock-store application is not bundled
 in a standalone wheel.

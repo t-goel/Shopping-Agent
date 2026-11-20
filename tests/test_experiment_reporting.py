@@ -6,8 +6,16 @@ import pytest
 
 from server.state import load_examples
 from shopping_agent.agent.agent import Agent
+from shopping_agent.contracts import TrialResult
 from shopping_agent.eval.report import failure_category, markdown_report, summarize
-from shopping_agent.eval.runner import isolated_trial, run_suite, run_trial
+from shopping_agent.eval.runner import (
+    isolated_trial,
+    metadata,
+    model_turns_for_tool_budget,
+    run_suite,
+    run_trial,
+    select_agent,
+)
 
 
 def fixture():
@@ -133,6 +141,64 @@ def test_per_task_report_partial_usage_and_mixed_conditions():
         summarize([good, other])
     legacy = good.model_copy(update={"run_metadata": {**good.run_metadata, "agent_surface": None}})
     assert summarize([good, legacy])["identity"]["agent_surface"] == "structured"
+
+
+def test_model_turn_budget_is_derived_from_tool_calls_and_overridable():
+    assert model_turns_for_tool_budget(20) == 21
+    assert metadata(20, 60, "claude")["max_model_turns"] == 21
+    assert metadata(20, 60, "claude", 3)["max_model_turns"] == 3
+
+    derived, name = select_agent(agent_name="claude", max_turns=21)
+    assert name == "claude" and derived.max_turns == 21
+    override, _ = select_agent(agent_name="claude", max_turns=3)
+    assert override.max_turns == 3
+    # A caller-supplied agent keeps its own explicit turn budget.
+    supplied, _ = select_agent(agent=override)
+    assert supplied is override and supplied.max_turns == 3
+
+
+def test_run_suite_records_model_turn_budget_in_metadata(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    catalog, tasks = load_examples(tasks_path=root / "data/tasks/harness")
+    derived = tmp_path / "derived.jsonl"
+    run_suite(catalog, tasks, derived, repetitions=1, max_calls=7)
+    row = json.loads(derived.read_text().splitlines()[0])
+    record = TrialResult.model_validate_json(derived.read_text().splitlines()[0])
+    assert row["run_metadata"]["max_tool_calls"] == 7
+    assert row["run_metadata"]["max_model_turns"] == 8
+    assert summarize([record])["overall"]["max_model_turns"] == 8
+
+
+def test_cli_max_turns_override_is_respected(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    root = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "PYTHONPATH": str(root / "src"), "NO_COLOR": "1"}
+    base = [
+        sys.executable, "-m", "shopping_agent.cli", "run",
+        "--mode", "flat", "--repetitions", "1",
+        "--tasks", str(root / "data/tasks/harness"),
+        "--max-calls", "7",
+    ]
+    derived_path = tmp_path / "cli-derived.jsonl"
+    completed = subprocess.run(
+        [*base, "--output", str(derived_path)],
+        cwd=root, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    row = json.loads(derived_path.read_text().splitlines()[0])
+    assert row["run_metadata"]["max_model_turns"] == 8
+
+    override_path = tmp_path / "cli-override.jsonl"
+    completed = subprocess.run(
+        [*base, "--max-turns", "3", "--output", str(override_path)],
+        cwd=root, env=env, capture_output=True, text=True, timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    row = json.loads(override_path.read_text().splitlines()[0])
+    assert row["run_metadata"]["max_model_turns"] == 3
 
 
 def test_failure_category_uses_expected_kind():

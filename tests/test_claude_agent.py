@@ -1,8 +1,17 @@
+from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
 from shopping_agent.agent.agent import Agent
-from shopping_agent.contracts import ClaudeAnswer
+from shopping_agent.contracts import (
+    ClaudeAnswer,
+    Constraint,
+    ProductObservation,
+    RequestInterpretation,
+    ShoppingRequest,
+)
+from shopping_agent.verifier import eligible
 
 
 def test_claude_answer_requires_product_for_completed_status():
@@ -226,16 +235,52 @@ def test_model_budget_omission_is_not_silently_injected():
     assert result.agent_diagnostics.get("verification_rejections")
 
 
-def test_clarification_is_not_nudged_into_a_purchase():
+def test_false_clarification_is_coerced_to_a_product_pick():
+    """A clarify loop cannot override an eligible in-stock observed candidate."""
     catalog, tasks = load_examples()
     clarification = '''{"status":"clarification_needed","product_id":"",
       "response":"Which matters more, capacity or waterproofing?"}'''
+    agent = ScriptedClaude([search("bags"), final(clarification)])
     result = run_trial(catalog, tasks["prefer_comfort_but_require_waterproof_pack"],
-                       agent=ScriptedClaude([search("bags"), final(clarification)]))
-    assert not result.is_successful
+                       agent=agent)
+    assert result.is_successful, result.model_dump()
+    assert result.termination_reason == "completed"
+    assert result.selected_product_ids == ["basalt-carryall"]
+    assert result.cart_items[0].product_id == "basalt-carryall"
+    diagnostics = result.agent_diagnostics
+    assert diagnostics["coerced_from_clarification"] is True
+    # model_status still records what the model actually returned.
+    assert diagnostics["model_status"] == "clarification_needed"
+    assert diagnostics["fallback_status"] == "completed"
+    candidates = diagnostics["false_abstention_candidates"]
+    assert any(item["product_id"] == "basalt-carryall" for item in candidates)
+    assert diagnostics["model_turns"] == 2
+
+
+def test_genuine_clarification_after_search_is_not_overridden():
+    """A question about an attribute the request never constrained stands."""
+    catalog, tasks = load_examples()
+    task = tasks["clarify_jacket_size_nl"]
+    clarification = '''{"status":"clarification_needed","product_id":"",
+      "response":"What jacket size do you need?"}'''
+    agent = ScriptedClaude([search("jackets"), final(clarification)])
+    # Simulate a live interpreter that did not pre-flag the ambiguity.
+    agent.interpretation = RequestInterpretation(
+        request=ShoppingRequest(
+            original_text=task.request.original_text,
+            constraints=[c.model_copy(deep=True) for c in task.request.constraints],
+        ),
+        ranking_rule=task.ranking_rule,
+    )
+    result = run_trial(catalog, task, agent=agent)
+    assert result.is_successful, result.model_dump()
     assert result.termination_reason == "clarification_needed"
-    assert result.response_text.startswith("Which matters more")
+    assert result.selected_product_ids == []
     assert not result.cart_items
+    assert result.agent_diagnostics["model_status"] == "clarification_needed"
+    assert result.agent_diagnostics["clarification_preserved_for_unconstrained_attribute"] is True
+    assert result.agent_diagnostics["false_abstention_candidates"]
+    assert not result.agent_diagnostics.get("coerced_from_clarification")
 
 
 def test_search_limit_is_bounded_to_public_tool_schema():
@@ -440,21 +485,103 @@ def test_stock_drop_rejection_feeds_back_and_agent_recovers_within_budget():
     assert result.tool_calls <= 20
 
 
-def test_repeated_gate_rejections_exhaust_budget_and_abstain():
+def test_repeated_gate_rejections_recover_by_deterministic_fallback():
+    """When turns run out with a rejection, a tool-only runner-up retry recovers."""
     catalog, tasks = load_examples()
     stale = jacket_decision("ridge-shell", "Ridge Shell is under budget.", 89)
     agent = ScriptedClaude([search("jackets"), final(stale), final(stale)], max_turns=3)
     result = run_trial(catalog, tasks["price_hike_recover_to_alternative"], agent=agent)
 
-    assert not result.is_successful
-    assert result.termination_reason == "no_valid_product"
-    assert result.selected_product_ids == []
-    assert not result.cart_items
-    assert result.agent_diagnostics["recovery_exhausted"] is True
-    assert len(result.agent_diagnostics["verification_rejections"]) == 2
-    assert "verification" in result.response_text
-    assert not result.agent_diagnostics.get("recovered_after_rejection")
+    assert result.is_successful, result.model_dump()
+    assert result.termination_reason == "completed"
+    assert result.selected_product_ids == ["summit-shell"]
+    assert result.cart_items[0].product_id == "summit-shell"
+    diagnostics = result.agent_diagnostics
+    assert diagnostics["recovered_by_deterministic_fallback"] is True
+    assert diagnostics["selected_by"] == "deterministic_fallback"
+    assert len(diagnostics["verification_rejections"]) == 2
+    assert not diagnostics.get("recovery_exhausted")
+    assert result.response_text.startswith("Selected")
+    assert diagnostics["model_turns"] == 3
+    assert result.tool_calls <= 20
 
     observation = verification_observation(agent.messages_seen)
     assert observation["rejected_product_id"] == "ridge-shell"
-    assert observation["turns_remaining"] == 1
+    # A zero-remaining-turn observation is never sent; no model call can consume it.
+    turns_remaining = []
+    for messages in agent.messages_seen:
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, str) and content.startswith("{"):
+                try:
+                    payload = json.loads(content)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(payload, dict) and payload.get("type") == "verification_failure":
+                    turns_remaining.append(payload["turns_remaining"])
+    assert turns_remaining == [1]
+
+
+def test_deterministic_fallback_exhaustion_does_not_claim_model_completed():
+    """A final no_valid_product must not carry the rejected pick's model_status."""
+    catalog, tasks = load_examples()
+    stale = jacket_decision("ridge-shell", "Ridge Shell is under budget.", 89)
+    agent = ScriptedClaude([search("jackets"), final(stale)], max_turns=2)
+    result = run_trial(catalog, tasks["no_waterproof_jacket_under_50"], agent=agent)
+
+    # This task expects a no-match, so the abstention is itself a successful trial.
+    assert result.termination_reason == "no_valid_product"
+    assert result.selected_product_ids == []
+    assert not result.cart_items
+    diagnostics = result.agent_diagnostics
+    assert diagnostics["model_status"] == "no_valid_product"
+    assert diagnostics["recovery_exhausted"] is True
+    assert diagnostics["deterministic_fallback_exhausted"] is True
+    assert diagnostics["model_turns"] == 2
+
+
+def _observation(product):
+    return ProductObservation(
+        product=product,
+        source_url="http://testserver/listing",
+        observed_at=datetime.now(timezone.utc),
+    )
+
+
+@pytest.mark.parametrize("product_id,value,expected", [
+    ("ridge-shell", "medium", "M"),
+    ("tarn-fell", 9, "9"),
+    ("tarn-fell", "US 9 men's", "9"),
+])
+def test_live_style_interpreter_sizes_are_normalized(product_id, value, expected):
+    """Provider-sized values must not reject an otherwise eligible product."""
+    catalog, _ = load_examples()
+    product = next(item for item in catalog.products if item.product_id == product_id)
+    observation = _observation(product)
+    normalized = Agent.normalize_constraints(
+        [Constraint(attribute="size", operator="eq", value=value)], [observation]
+    )
+    assert normalized[0].value == expected
+    assert eligible(observation, normalized)
+
+
+def test_capacity_liters_eq_tolerance_requires_approximate_request():
+    catalog, _ = load_examples()
+    product = next(item for item in catalog.products if item.product_id == "basalt-carryall")
+    observation = _observation(product)
+    for value, should_match in ((30, True), (34, True), (50, False)):
+        normalized = Agent.normalize_constraints(
+            [Constraint(attribute="capacity_liters", operator="eq", value=value)],
+            [observation],
+            approximate_capacity=True,
+        )
+        assert normalized[0].tolerance == 5.0
+        assert eligible(observation, normalized) is should_match
+
+    # An exact "eq 34" must not inherit the approximate tolerance and admit a 30 L bag.
+    exact = Agent.normalize_constraints(
+        [Constraint(attribute="capacity_liters", operator="eq", value=34)],
+        [observation],
+    )
+    assert exact[0].tolerance is None
+    assert not eligible(observation, exact)
