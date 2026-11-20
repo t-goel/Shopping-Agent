@@ -63,14 +63,14 @@ def test_missing_or_malformed_snapshot_is_not_a_pass(completed, snapshot):
     completed.final_state = snapshot
     result = audit_records([completed])
     assert result["summary"]["selection_cart_consistency"] == {"unassessable": 1}
-    assert result["summary"]["structured_claim_contradiction_rate"] is None
+    assert result["summary"]["unsupported_claim_rate"] is None
 
 
 def test_empty_claims_are_not_reported_as_zero_contradictions(completed):
     completed.claims = []
     summary = audit_records([completed])["summary"]
     assert summary["trials_with_claims"] == 0
-    assert summary["structured_claim_contradiction_rate"] is None
+    assert summary["unsupported_claim_rate"] is None
 
 
 def test_invalid_unknown_and_typed_claims(completed):
@@ -83,7 +83,7 @@ def test_invalid_unknown_and_typed_claims(completed):
     summary = audit_records([completed])["summary"]
     assert summary["structured_claims"] == {"supports": 0, "contradicts": 1, "unknown": 2, "invalid": 1}
     assert summary["assessable_claims"] == 1
-    assert summary["structured_claim_contradiction_rate"] == 1
+    assert summary["unsupported_claim_rate"] == 1
 
 
 def test_off_cart_mentions_are_only_review_flags(completed):

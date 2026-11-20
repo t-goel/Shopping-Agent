@@ -1,8 +1,12 @@
 """Post-run extraction and audit of atomic product facts in free-text explanations.
 
-Structured claims stay on the verifier. This module reads the explanation after
-a trial and checks stated product facts against recorded get_listing (and
-search) observations, preferring the latest observation of each product.
+Structured claims stay on the verifier and drive the report's unsupported-claim
+rate (see ``eval.metrics``). This module is a secondary, advisory diagnostic: it
+reads the explanation after a trial and checks stated product facts against
+recorded get_listing (and search) observations, preferring the latest observation
+of each product. Its windowed regular expressions miss aliases and can attach a
+nearby figure to the wrong product, so its rate is reported separately as
+``prose_claim_contradiction_rate`` and never as the unsupported-claim rate.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from collections import Counter
 from pydantic import ValidationError
 
 from shopping_agent.contracts import Product, TrialResult
+from shopping_agent.eval.metrics import final_products
 
 _PRICE = re.compile(r"\$\s*(\d+(?:\.\d{1,2})?)")
 _RATING = re.compile(
@@ -57,20 +62,6 @@ class ProseClaim:
 
 def _normalized(text: str) -> str:
     return " ".join(text.casefold().split())
-
-
-def _products_from_snapshot(snapshot: dict | None) -> dict[str, Product]:
-    products: dict[str, Product] = {}
-    if not snapshot or not isinstance(snapshot.get("products"), dict):
-        return products
-    for pid, value in snapshot["products"].items():
-        try:
-            product = Product.model_validate(value)
-        except (ValidationError, TypeError):
-            continue
-        if product.product_id == pid:
-            products[pid] = product
-    return products
 
 
 def _record_product(obs: dict, observations: dict[str, dict]) -> None:
@@ -158,7 +149,7 @@ def _span(text: str, start: int, end: int) -> str:
 
 
 def _products_for_text(record: TrialResult) -> dict[str, Product]:
-    products = _products_from_snapshot(record.final_state)
+    products = final_products(record)
     # Titles the agent can name also come from listings it actually opened.
     for pid, row in listing_observations(record).items():
         if pid in products or not isinstance(row.get("title"), str):
@@ -327,12 +318,12 @@ def _matches(claimed, observed) -> bool:
 def audit_prose_claim(
     claim: ProseClaim,
     observations: dict[str, dict],
-    final_products: dict[str, Product],
+    catalog: dict[str, Product],
 ) -> dict:
     """Compare one extracted fact with the latest recorded listing, else final state."""
     result = {**claim.to_dict(), "status": "unknown", "observed_value": None, "source": None}
     observed = observations.get(claim.product_id, {})
-    product = final_products.get(claim.product_id)
+    product = catalog.get(claim.product_id)
     # get_listing observations are the evidence the explanation may use.
     # Final state is the fallback when the trial recorded no listing observation.
     primary = observed if observed else {}
@@ -347,11 +338,11 @@ def audit_prose_claim(
 
 def audit_prose_claims(record: TrialResult) -> dict:
     """Extract explanation facts and score them against recorded observations."""
-    final_products = _products_from_snapshot(record.final_state)
+    catalog = final_products(record)
     observations = listing_observations(record)
     products = _products_for_text(record)
     extracted = extract_prose_claims(record.response_text, products)
-    audited = [audit_prose_claim(claim, observations, final_products) for claim in extracted]
+    audited = [audit_prose_claim(claim, observations, catalog) for claim in extracted]
     counts = Counter(item["status"] for item in audited)
     assessed = counts["supports"] + counts["contradicts"]
     return {
@@ -364,7 +355,7 @@ def audit_prose_claims(record: TrialResult) -> dict:
             "unknown": counts.get("unknown", 0),
         },
         "assessable_prose_claims": assessed,
-        "unsupported_claim_rate": counts["contradicts"] / assessed if assessed else None,
+        "prose_claim_contradiction_rate": counts["contradicts"] / assessed if assessed else None,
     }
 
 
@@ -376,13 +367,13 @@ def aggregate_prose_audits(trial_audits: list[dict]) -> dict:
     return {
         "prose_claims": {"supports": supports, "contradicts": contradicts, "unknown": unknown},
         "assessable_prose_claims": assessed,
-        "unsupported_claim_rate": contradicts / assessed if assessed else None,
+        "prose_claim_contradiction_rate": contradicts / assessed if assessed else None,
         "trials_with_prose_claims": sum(bool(item["prose_claims"]) for item in trial_audits),
     }
 
 
-def unsupported_claim_rate(records: list[TrialResult]) -> float | None:
+def prose_claim_contradiction_rate(records: list[TrialResult]) -> float | None:
     """Share of assessable prose facts that contradict recorded observations."""
     return aggregate_prose_audits([audit_prose_claims(record) for record in records])[
-        "unsupported_claim_rate"
+        "prose_claim_contradiction_rate"
     ]
