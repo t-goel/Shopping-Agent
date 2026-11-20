@@ -17,13 +17,15 @@ from shopping_agent.contracts import (
     ClaudeAnswer,
     Constraint,
     Operator,
+    ProductObservation,
     RequestInterpretation,
     SearchInput,
     ShoppingRequest,
+    listing_id_for,
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
-from shopping_agent.tools.budget import BudgetExceeded
+from shopping_agent.tools.budget import BudgetExceeded, verification_scope
 from shopping_agent.verifier import (
     eligible,
     field_value,
@@ -197,8 +199,11 @@ class VerificationRejection:
     stock: int | None = None
     size: str | None = None
     attributes: dict = field(default_factory=dict)
+    listing_id: str | None = None
+    matched_observation: bool = True
 
     def as_dict(self) -> dict:
+        """Bounded record of one rejection, including how the gate reached its verdict."""
         return {
             "product_id": self.product_id,
             "reason": self.reason,
@@ -207,7 +212,65 @@ class VerificationRejection:
             "observed_stock": self.stock,
             "observed_size": self.size,
             "observed_attributes": self.attributes,
+            "gate_input_source": self.diagnostics.get("gate_input_source"),
+            "corrected_constraints": self.diagnostics.get("corrected_constraints", []),
+            "ambiguous_product_id": self.diagnostics.get("ambiguous_product_id"),
         }
+
+
+@dataclass
+class ObservationCache:
+    """Listing observations from one run, keyed by listing identity.
+
+    A bare product ID is not a listing key. On a multi-store catalog the same
+    product is offered by several stores, so caching observations by product ID
+    lets one store's variant overwrite another's. Keys are listing IDs when the
+    catalog has them, and bare product IDs only when the response carried no
+    listing identity (flat single-store catalogs).
+    """
+
+    by_listing: dict[str, ProductObservation] = field(default_factory=dict)
+    listings_for_product: dict[str, list[str]] = field(default_factory=dict)
+
+    @staticmethod
+    def key(observation: ProductObservation) -> str:
+        return observation.listing_id or observation.product.product_id
+
+    def record(self, observation: ProductObservation) -> None:
+        key = self.key(observation)
+        self.by_listing[key] = observation
+        known = self.listings_for_product.setdefault(observation.product.product_id, [])
+        if key not in known:
+            known.append(key)
+
+    def get(self, key: str | None) -> ProductObservation | None:
+        return self.by_listing.get(key) if key else None
+
+    def candidates_for(self, product_id: str | None) -> list[str]:
+        """Every listing key observed for a product, in first-seen order."""
+        if not product_id:
+            return []
+        known = self.listings_for_product.get(product_id)
+        if known:
+            return list(known)
+        return [product_id] if product_id in self.by_listing else []
+
+    def resolve(self, product_id: str | None, listing_id: str | None) -> tuple[str | None, list[str]]:
+        """Return the one observed key for a proposed pick, else the ambiguous candidates."""
+        if listing_id and listing_id in self.by_listing:
+            return listing_id, []
+        candidates = self.candidates_for(product_id)
+        if listing_id:
+            candidates = [key for key in candidates if key == listing_id]
+        if len(candidates) == 1:
+            return candidates[0], []
+        return None, candidates
+
+    def observations(self) -> list[ProductObservation]:
+        return list(self.by_listing.values())
+
+    def listing_ids(self) -> list[str]:
+        return sorted(self.by_listing)
 
 
 class Agent:
@@ -263,7 +326,10 @@ class Agent:
             return AgentOutput(
                 response_text=inputs.request.clarification_needed,
                 termination_reason="clarification_needed",
-                diagnostics={"model_turns": self.model_turns},
+                diagnostics={
+                    "model_turns": self.model_turns,
+                    "gate_input_source": "none",
+                },
             )
         if not self.api_key:
             raise RuntimeError("ANTHROPIC_API_KEY is not set")
@@ -297,6 +363,7 @@ class Agent:
         if clarification_needed:
             diagnostics["model_status"] = "clarification_needed"
             diagnostics["model_turns"] = self.model_turns
+            diagnostics["gate_input_source"] = "none"
             return AgentOutput(
                 response_text=clarification_needed,
                 termination_reason="clarification_needed",
@@ -314,7 +381,7 @@ class Agent:
                 "ranking_rule": active_ranking_rule,
             }),
         }]
-        products = {}
+        observations = ObservationCache()
         correction_used = False
         last_response_error = None
         rejections: list[VerificationRejection] = []
@@ -349,7 +416,7 @@ class Agent:
                     answer,
                     inputs,
                     tools,
-                    products,
+                    observations,
                     active_constraints=active_constraints,
                     active_ranking_rule=active_ranking_rule,
                     approximate_capacity=approximate_capacity,
@@ -368,7 +435,7 @@ class Agent:
                         "role": "user",
                         "content": self._verification_observation(
                             outcome,
-                            products,
+                            observations,
                             rejected_ids=[item.product_id for item in rejections],
                             turns_remaining=turns_remaining,
                         ),
@@ -400,13 +467,9 @@ class Agent:
                         continue
                     if block["name"] == "search":
                         for item in result.items:
-                            products[item.product.product_id] = item
-                            if item.listing_id:
-                                products[item.listing_id] = item
+                            observations.record(item)
                     elif block["name"] == "get_listing":
-                        products[result.product.product_id] = result
-                        if result.listing_id:
-                            products[result.listing_id] = result
+                        observations.record(result)
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block["id"],
@@ -426,7 +489,7 @@ class Agent:
                 rejection.as_dict() for rejection in rejections
             ]
             fallback = self._deterministic_pick(
-                products, rejections, tools, active_constraints, active_ranking_rule,
+                observations, rejections, tools, active_constraints, active_ranking_rule,
                 diagnostics, approximate_capacity=approximate_capacity,
             )
             if fallback is not None:
@@ -440,6 +503,8 @@ class Agent:
             diagnostics["recovery_exhausted"] = True
             diagnostics["deterministic_fallback_exhausted"] = True
             diagnostics["model_turns"] = self.model_turns
+            # Still report whether the abstention looks wrong from what was observed.
+            diagnostics.update(self._abstention_diagnostics(observations, active_constraints))
             return AgentOutput(
                 response_text=(
                     "The selected product failed final verification after a catalog change, "
@@ -454,11 +519,11 @@ class Agent:
         raise RuntimeError("Claude used too many turns")
 
     @staticmethod
-    def _candidate_observations(products: dict) -> list:
+    def _candidate_observations(observations: ObservationCache) -> list:
         """Unique observed products, keyed by store listing."""
         seen = set()
         candidates = []
-        for observation in products.values():
+        for observation in observations.observations():
             key = (observation.store_id, observation.product.product_id)
             if key in seen:
                 continue
@@ -502,7 +567,7 @@ class Agent:
         return None
 
     def _deterministic_pick(
-        self, products, rejections, tools, constraints, rule, diagnostics,
+        self, observations, rejections, tools, constraints, rule, diagnostics,
         approximate_capacity: bool = False,
     ):
         """Re-rank observed candidates and buy the best eligible runner-up.
@@ -516,7 +581,7 @@ class Agent:
         rejected_ids = {item.product_id for item in rejections}
         candidates = [
             observation
-            for observation in self._candidate_observations(products)
+            for observation in self._candidate_observations(observations)
             if observation.product.product_id not in rejected_ids
         ]
         if not candidates:
@@ -609,20 +674,60 @@ class Agent:
         return None
 
     @staticmethod
+    def _abstention_diagnostics(observations: ObservationCache, constraints) -> dict:
+        """Record whether an abstention looks false given what the run observed.
+
+        This is an advisory signal for triage, not a re-score: an abstention never
+        triggers a live re-read, so the observations behind it may be stale.
+        """
+        # Compare against listed types first, exactly as the purchase gate would.
+        active = Agent.normalize_constraints(
+            list(constraints or []), observations.observations()
+        )
+        matching = [
+            key for key, observation in observations.by_listing.items()
+            if eligible(observation, active)
+        ]
+        return {
+            "gate_input_source": "observation_cache",
+            "false_abstention_candidate": {
+                "present": bool(matching),
+                "listing_ids": matching,
+                "source": "observation_cache",
+                "note": (
+                    "Observations only, not a fresh catalog read; an abstention never "
+                    "forces a live re-read."
+                ),
+            },
+            "observed_listing_ids": observations.listing_ids(),
+        }
+
+    @staticmethod
     def _verification_observation(
         rejection: VerificationRejection,
-        products: dict,
-        rejected_ids: list[str],
-        turns_remaining: int,
+        observations: ObservationCache | dict | None = None,
+        rejected_ids: list[str] | None = None,
+        turns_remaining: int = 0,
+        products: dict | None = None,
     ) -> str:
         """Render a gate rejection as a tool-like observation for the next ReAct turn."""
+        if observations is None and products is not None:
+            observations = products
+        obs_iter = []
+        if isinstance(observations, ObservationCache):
+            obs_iter = observations.observations()
+        elif isinstance(observations, dict):
+            obs_iter = list(observations.values())
+        elif isinstance(observations, list):
+            obs_iter = observations
+
         candidates = []
-        seen = set()
-        for observation in products.values():
-            key = (observation.store_id, observation.product.product_id)
-            if key in seen or observation.product.product_id == rejection.product_id:
+        for observation in obs_iter:
+            if rejection.matched_observation and (
+                observation.product.product_id == rejection.product_id
+                and rejection.listing_id in (None, observation.listing_id)
+            ):
                 continue
-            seen.add(key)
             candidates.append({
                 "product_id": observation.product.product_id,
                 "listing_id": observation.listing_id,
@@ -815,14 +920,17 @@ class Agent:
         return text
 
     @staticmethod
-    def normalize_constraints(constraints, listings, approximate_capacity: bool = False):
+    def normalize_constraints(
+        constraints, listings, approximate_capacity: bool = False, corrections: list | None = None,
+    ):
         """Coerce live interpreter values to the types observed in listings.
 
         Handles booleans/numbers given as strings plus provider-style sizes
         (``medium``, ``9``, ``US 9 men's``). A tolerance is added to a capacity
         ``eq`` only when the request actually describes an approximate amount.
         Only called at verification time; the agent's declared constraints are
-        never rewritten for the model.
+        never rewritten for the model. When ``corrections`` is supplied, the
+        type coercions applied by the gate are recorded there for the report.
         """
         normalized = []
         for constraint in constraints:
@@ -871,6 +979,14 @@ class Agent:
                 if str(value) == observed or (isinstance(value, float) and value.is_integer() and str(int(value)) == observed):
                     value = observed
 
+            if value != constraint.value and corrections is not None:
+                corrections.append({
+                    "attribute": constraint.attribute,
+                    "from": constraint.value,
+                    "to": value,
+                    "observed_type": type(observed).__name__,
+                })
+
             if (
                 approximate_capacity
                 and constraint.attribute == "capacity_liters"
@@ -894,19 +1010,32 @@ class Agent:
         provider_answer,
         inputs,
         tools,
-        products,
+        observations: ObservationCache | dict | None = None,
         active_constraints=None,
         active_ranking_rule=None,
         approximate_capacity: bool = False,
         is_repair: bool = False,
+        products: dict | ObservationCache | None = None,
     ):
+        if observations is None and products is not None:
+            observations = products
+        if not isinstance(observations, ObservationCache):
+            obs_cache = ObservationCache()
+            if isinstance(observations, dict):
+                for obs in observations.values():
+                    obs_cache.record(obs)
+            elif isinstance(observations, list):
+                for obs in observations:
+                    obs_cache.record(obs)
+            observations = obs_cache
         content = provider_answer.get("content", [])
         stop_reason = provider_answer.get("stop_reason")
         response_text = decision["response"].strip()
         diagnostics = {
             "model_status": decision["status"],
             "model_product_id": decision.get("product_id") or None,
-            "observed_product_ids": sorted(products),
+            "observed_product_ids": sorted(observations.listings_for_product),
+            "observed_listing_ids": observations.listing_ids(),
         }
         if active_constraints is not None:
             diagnostics["extracted_constraints"] = [c.model_dump(mode="json") for c in active_constraints]
@@ -918,7 +1047,7 @@ class Agent:
             # A clarification loop is a false abstention when the products already
             # observed contain an eligible, in-stock match for the interpreted
             # constraints. Downgrade the ask into a deterministic product pick.
-            candidates = self._candidate_observations(products)
+            candidates = self._candidate_observations(observations)
             normalized = self.normalize_constraints(
                 active_constraints or [], candidates, approximate_capacity
             )
@@ -940,7 +1069,7 @@ class Agent:
                     diagnostics["clarification_preserved_for_unconstrained_attribute"] = True
                 else:
                     fallback = self._deterministic_pick(
-                        products, [], tools, active_constraints, active_ranking_rule,
+                        observations, [], tools, active_constraints, active_ranking_rule,
                         diagnostics, approximate_capacity=approximate_capacity,
                     )
                     if fallback is not None:
@@ -950,6 +1079,7 @@ class Agent:
                         ]
                         return fallback
             diagnostics["model_turns"] = self.model_turns
+            diagnostics["gate_input_source"] = "none"
             return AgentOutput(
                 response_text=response_text,
                 termination_reason="clarification_needed",
@@ -957,6 +1087,8 @@ class Agent:
             )
 
         if decision["status"] == "no_valid_product":
+            # Abstentions are checked against observed state only; nothing is re-read.
+            diagnostics.update(self._abstention_diagnostics(observations, active_constraints))
             return AgentOutput(
                 response_text=response_text,
                 termination_reason="no_valid_product",
@@ -987,14 +1119,35 @@ class Agent:
         if listing_id and ":" not in listing_id:
             if not product_id:
                 product_id = listing_id
-            if store_id:
-                listing_id = f"{store_id}:{product_id}"
-            else:
-                listing_id = None
+            # A bare store plus a bare product is that store's listing key.
+            listing_id = listing_id_for(store_id, product_id) if store_id else None
+        elif not listing_id and store_id and product_id:
+            # An explicit store narrows the pick to that store's listing of the product.
+            listing_id = listing_id_for(store_id, product_id)
 
-        prior = products.get(listing_id) if listing_id else None
-        if prior is None and product_id:
-            prior = products.get(product_id)
+        key, candidates = observations.resolve(product_id, listing_id)
+        if key is None and candidates:
+            note = (
+                f"product_id {product_id!r} is listed by {len(candidates)} stores "
+                f"({', '.join(candidates)}); return the listing_id of the variant meant"
+            )
+            diagnostics.update({
+                "gate_input_source": "none",
+                "ambiguous_product_id": {
+                    "product_id": product_id,
+                    "candidate_listing_ids": candidates,
+                },
+                "verification_rejection": {"product_id": product_id, "reason": note},
+            })
+            return VerificationRejection(
+                product_id=product_id or "",
+                reason=note,
+                response_text=response_text,
+                diagnostics=diagnostics,
+                matched_observation=False,  # Keep both variants visible as candidates.
+            )
+
+        prior = observations.get(key)
         if prior is not None:
             listing_id = listing_id or prior.listing_id
             store_id = store_id or prior.store_id
@@ -1067,8 +1220,11 @@ class Agent:
         diagnostics["store_id"] = store_id
 
         # Verify Claude's chosen product against a refreshed listing; do not re-rank it.
+        # The refresh reads live store state, so a change since the model's observation wins.
+        diagnostics["gate_input_source"] = "live_refresh"
         try:
-            product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
+            with verification_scope(tools):
+                product = tools.get_listing(product_id, store_id=store_id, listing_id=listing_id)
         except ToolError as exc:
             if exc.status_code != 404:
                 raise
@@ -1090,12 +1246,12 @@ class Agent:
             store_id = product.store_id
         diagnostics["listing_id"] = listing_id
         diagnostics["store_id"] = store_id
-        products[product_id] = product
-        if product.listing_id:
-            products[product.listing_id] = product
+        observations.record(product)
+        corrections = []
         constraints = self.normalize_constraints(
-            constraints, [product], approximate_capacity
+            constraints, [product], approximate_capacity, corrections
         )
+        diagnostics["corrected_constraints"] = corrections
         diagnostics["interpreted_constraints"] = [row.model_dump(mode="json") for row in constraints]
         diagnostics["eligible_product_ids"] = (
             [product_id] if eligible(product, constraints) else []
@@ -1118,17 +1274,19 @@ class Agent:
                 stock=product.product.stock,
                 size=field_value(product, "size"),
                 attributes=dict(product.product.attributes) if getattr(product.product, "attributes", None) else {},
+                listing_id=product.listing_id,
             )
 
-        cart = tools.inspect_cart()
-        if cart.items:
-            raise ClaudeResponseError(stop_reason, content, "cart was not empty before purchase")
-        cart = tools.add_to_cart(CartSelection(
-            product_id=product_id,
-            quantity=1,
-            store_id=product.store_id,
-            listing_id=product.listing_id,
-        ))
+        with verification_scope(tools):
+            cart = tools.inspect_cart()
+            if cart.items:
+                raise ClaudeResponseError(stop_reason, content, "cart was not empty before purchase")
+            cart = tools.add_to_cart(CartSelection(
+                product_id=product_id,
+                quantity=1,
+                store_id=product.store_id,
+                listing_id=product.listing_id,
+            ))
         if len(cart.items) != 1 or cart.items[0].product_id != product_id:
             raise ClaudeResponseError(stop_reason, content, "cart verification failed")
         if (

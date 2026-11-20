@@ -6,12 +6,9 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from pydantic import ValidationError
-
-from shopping_agent.comparison import matches
-from shopping_agent.contracts import Constraint, Product, TrialResult
+from shopping_agent.contracts import TrialResult
+from shopping_agent.eval.metrics import claim_audit, final_products, structured_claim_summary
 from shopping_agent.eval.prose_claims import aggregate_prose_audits, audit_prose_claims
-from shopping_agent.interfaces import Claim
 
 
 def normalized(text):
@@ -38,15 +35,7 @@ def audit_trial(record: TrialResult):
         "claims": [], "response_title_review": [],
     }
     snapshot = record.final_state
-    products = {}
-    if snapshot and isinstance(snapshot.get("products"), dict):
-        for pid, value in snapshot["products"].items():
-            try:
-                product = Product.model_validate(value)
-                if product.product_id == pid:
-                    products[pid] = product
-            except (ValidationError, TypeError):
-                pass  # Missing/malformed facts cannot support a claim.
+    products = final_products(record)
 
     purchased_ids: set[str] = set()
     cart = snapshot.get("cart", {}).get("items") if snapshot and isinstance(snapshot.get("cart"), dict) else None
@@ -75,51 +64,32 @@ def audit_trial(record: TrialResult):
             ):
                 result["response_title_review"].append({"product_id": pid, "title": product.title})
 
-    for index, raw in enumerate(record.claims):
-        entry = {"index": index, "status": "invalid", "observed_value": None}
-        try:
-            claim = Claim.model_validate(raw)
-        except (ValidationError, TypeError):
-            result["claims"].append(entry)
-            continue
-        entry.update(claim_id=claim.claim_id, product_id=claim.product_id,
-                     field=claim.field, claimed_value=claim.value, status="unknown")
-        product = products.get(claim.product_id)
-        if product is not None:
-            value = (getattr(product, claim.field) if claim.field in type(product).model_fields
-                     else product.attributes.get(claim.field))
-            if type(value) in (str, int, float, bool):
-                entry["observed_value"] = value
-                entry["status"] = "supports" if matches(product, Constraint(
-                    attribute=claim.field, operator="eq", value=claim.value)) else "contradicts"
-        result["claims"].append(entry)
+    result["claims"] = claim_audit(record, products)
     result.update(audit_prose_claims(record))
     return result
 
 
 def audit_records(records, input_bytes: bytes | None = None):
     trials = [audit_trial(record) for record in records]
-    claims = Counter(c["status"] for trial in trials for c in trial["claims"])
-    assessed = claims["supports"] + claims["contradicts"]
+    # One shared definition of an unsupported claim, identical to the report's.
+    claims = structured_claim_summary(records)
     prose = aggregate_prose_audits(trials)
     report = {
-        "audit_version": "prose-observations-v1",
+        "audit_version": "structured-claims-v2",
         "summary": {
             "trials": len(trials),
             "selection_cart_consistency": dict(Counter(t["selection_cart_consistency"] for t in trials)),
             "recorded_cart_consistency": dict(Counter(t["recorded_cart_consistency"] for t in trials)),
-            "structured_claims": {s: claims[s] for s in ("supports", "contradicts", "unknown", "invalid")},
-            "assessable_claims": assessed,
-            "structured_claim_contradiction_rate": claims["contradicts"] / assessed if assessed else None,
-            "trials_with_claims": sum(bool(t["claims"]) for t in trials),
+            **claims,
             "response_title_review_trials": sum(bool(t["response_title_review"]) for t in trials),
             **prose,
         },
         "limitations": [
             "This audit does not change benchmark success or compare agent performance.",
             "Structured claim checks cover declared scalar facts, evaluated at final-state time.",
-            "Prose claims are atomic product facts extracted from the explanation and checked against the latest recorded get_listing observation, with final state only when no listing was recorded.",
-            "Unsupported-claim rate is contradicted prose facts divided by prose facts that could be checked. Trials with no extracted facts stay out of that denominator.",
+            "Unsupported-claim rate is contradicted declared claims divided by declared claims that could be checked. Trials with no checkable claim stay out of that denominator.",
+            "Prose claim contradiction rate is a separate advisory extraction of atomic product facts from the explanation, checked against the latest recorded get_listing observation, with final state only when no listing was recorded.",
+            "The prose rate is contradicted prose facts divided by prose facts that could be checked. Trials with no extracted facts stay out of that denominator.",
             "Extraction misses aliases, implicit references, and facts that do not name a recorded product title.",
             "Exact off-cart title mentions require human review; alternatives and negation can be legitimate.",
             "Title review covers all termination reasons; purchased titles are excluded.",

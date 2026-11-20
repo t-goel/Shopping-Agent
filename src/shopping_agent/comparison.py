@@ -174,12 +174,6 @@ def matches(product: Product, constraint: Constraint, tolerance: float | None = 
         value = v_num
         target = t_num
 
-    # Coerce boolean strings for comparison
-    if isinstance(value, bool) and isinstance(target, str) and target.casefold() in {"true", "false"}:
-        target = (target.casefold() == "true")
-    elif isinstance(target, bool) and isinstance(value, str) and value.casefold() in {"true", "false"}:
-        value = (value.casefold() == "true")
-
     if not numeric and type(value) is not type(target):
         return False
 

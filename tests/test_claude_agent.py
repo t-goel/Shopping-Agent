@@ -37,6 +37,7 @@ def test_agent_rejects_non_json_model_output():
 """Provider-free checks of Claude's final-decision boundary."""
 
 import json
+from pathlib import Path
 
 from server.state import load_examples
 from shopping_agent.agent.agent import Agent
@@ -585,3 +586,128 @@ def test_capacity_liters_eq_tolerance_requires_approximate_request():
     )
     assert exact[0].tolerance is None
     assert not eligible(observation, exact)
+
+
+def test_gate_reports_live_refresh_as_its_input_source():
+    """The gate judges a fresh read, so a price moved after the model looked still wins."""
+    catalog, tasks = load_examples()
+    task = tasks["nl_size9_waterproof_shoe_by_rating"].model_copy(deep=True)
+    task.mutations = [Mutation(after_observations=1, product_id="tarn-fell", price=95)]
+    decision = json.dumps({
+        "status": "completed",
+        "product_id": "tarn-fell",
+        "response": "Tarn Fell fits.",
+        "constraints": [
+            {"attribute": "category", "operator": "eq", "value": "footwear"},
+            {"attribute": "waterproof", "operator": "eq", "value": True},
+            {"attribute": "size", "operator": "eq", "value": "9"},
+        ],
+        "ranking_rule": "highest_rating_then_reviews",
+        "claims": [{"field": "price", "value": 91}],
+    })
+    result = run_trial(catalog, task, agent=ScriptedClaude([search("footwear"), final(decision)]))
+
+    assert result.is_successful, result.model_dump()
+    assert result.agent_diagnostics["gate_input_source"] == "live_refresh"
+    searched = result.tool_trace[0]["observation"]["items"][0]["product"]["price"]
+    refreshed = [row for row in result.tool_trace
+                 if row["purpose"] == "verification" and row["name"] == "get_listing"][-1]
+    assert searched == 74
+    assert refreshed["observation"]["product"]["price"] == 95
+    assert result.final_state["products"]["tarn-fell"]["price"] == 95
+
+
+def test_gate_coercion_is_reported_as_a_corrected_constraint():
+    """The gate coerces a stringified boolean for its own check and records doing so."""
+    root = Path(__file__).resolve().parents[1]
+    catalog, tasks = load_examples(tasks_path=root / "data/tasks/harness")
+    task = tasks["cheapest_waterproof_jacket"].model_copy(deep=True)
+    # A structured request can arrive with a stringified boolean from an upstream
+    # interpreter; the gate compares against the listed type and must say so.
+    task.request.constraints = [
+        row.model_copy(update={"value": str(row.value).lower()}) if row.attribute == "waterproof"
+        else row
+        for row in task.request.constraints
+    ]
+    decision = jacket_decision("ridge-shell", "Ridge Shell is the cheapest waterproof M.", 89)
+    result = run_trial(catalog, task, agent=ScriptedClaude([search("jackets"), final(decision)]))
+
+    assert result.agent_diagnostics["corrected_constraints"] == [{
+        "attribute": "waterproof",
+        "from": "true",
+        "to": True,
+        "observed_type": "bool",
+    }]
+    raw = {row["attribute"]: row["value"] for row in result.agent_diagnostics["raw_constraints"]}
+    assert raw["waterproof"] == "true"  # The declared value is kept, not overwritten.
+    # Scoring still reads the declared value, so the gate passing is not a pass.
+    assert not result.is_successful
+    assert result.constraints_satisfied == result.total_constraints - 1
+
+
+def test_abstention_records_whether_a_matching_candidate_was_observed():
+    catalog, tasks = load_examples()
+    decision = '''{"status":"no_valid_product","product_id":"","response":"No match.",
+      "constraints":[{"attribute":"category","operator":"eq","value":"footwear"},
+                     {"attribute":"waterproof","operator":"eq","value":true},
+                     {"attribute":"size","operator":"eq","value":"9"}],
+      "ranking_rule":"highest_rating_then_reviews","claims":[]}'''
+    result = run_trial(catalog, tasks["nl_size9_waterproof_shoe_by_rating"],
+                       agent=ScriptedClaude([search("footwear"), final(decision)]))
+    assert result.termination_reason == "no_valid_product"
+    candidate = result.agent_diagnostics["false_abstention_candidate"]
+    assert candidate["present"] is True
+    assert candidate["source"] == "observation_cache"
+    assert "tarn-fell" in {listing_id.split(":")[-1] for listing_id in candidate["listing_ids"]}
+    assert result.agent_diagnostics["gate_input_source"] == "observation_cache"
+
+
+def test_multi_store_ambiguous_product_id_is_rejected_instead_of_aliased():
+    """Two stores' variants of one product are distinct listings, never one cache slot."""
+    from server.multi_store import load_multi_store_examples
+
+    ingest, tasks = load_multi_store_examples()
+    ambiguous = json.dumps({
+        "status": "completed",
+        "product_id": "ridge-shell",
+        "response": "Trailworks Ridge Shell is the cheapest waterproof shell.",
+        "constraints": JACKET_CONSTRAINTS,
+        "ranking_rule": "lowest_price",
+        "claims": [{"field": "price", "value": 89}],
+    })
+    specific = json.dumps({
+        "status": "completed",
+        "product_id": "ridge-shell",
+        "listing_id": "trailworks-direct:ridge-shell",
+        "store_id": "trailworks-direct",
+        "response": "Trailworks Ridge Shell is the cheapest waterproof shell.",
+        "constraints": JACKET_CONSTRAINTS,
+        "ranking_rule": "lowest_price",
+        "claims": [{"field": "price", "value": 89}],
+    })
+    agent = ScriptedClaude([
+        search("jackets", store_id="trailworks-direct"),
+        search("jackets", store_id="summit-outfitters"),
+        final(ambiguous),
+        final(specific),
+    ])
+    result = run_trial(ingest, tasks["multistore_cheapest_waterproof_shell"], agent=agent)
+
+    assert result.is_successful, result.model_dump()
+    assert result.selected_listing_ids == ["trailworks-direct:ridge-shell"]
+    rejection = result.agent_diagnostics["verification_rejections"][0]
+    assert set(rejection["ambiguous_product_id"]["candidate_listing_ids"]) == {
+        "trailworks-direct:ridge-shell",
+        "summit-outfitters:ridge-shell",
+    }
+    observation = verification_observation(agent.messages_seen)
+    assert "listing_id" in observation["reason"]
+    # Both variants stay visible as candidates so the model can name one.
+    offered = {row["listing_id"] for row in observation["observed_candidates"]
+               if row["product_id"] == "ridge-shell"}
+    assert offered == {"trailworks-direct:ridge-shell", "summit-outfitters:ridge-shell"}
+    # The rejected attempt did not read or buy either variant.
+    listings_read = [
+        row["inputs"]["listing_id"] for row in result.tool_trace if row["name"] == "get_listing"
+    ]
+    assert listings_read == ["trailworks-direct:ridge-shell"]

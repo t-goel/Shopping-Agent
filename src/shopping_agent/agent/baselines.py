@@ -34,6 +34,7 @@ from shopping_agent.contracts import (
 )
 from shopping_agent.interfaces import AgentInput, AgentOutput, Claim, ShoppingTools
 from shopping_agent.tools.api import ToolError
+from shopping_agent.tools.budget import verification_scope
 from shopping_agent.verifier import eligible, verify_claims
 
 CONDITIONS = ("single_prompt", "react", "no_verifier", "full")
@@ -194,17 +195,19 @@ class OfflineAgent:
 
     def _cart(self, observation: ProductObservation, tools: ShoppingTools, verify: bool) -> bool:
         product = observation.product
-        try:
-            cart = tools.add_to_cart(CartSelection(
-                product_id=product.product_id,
-                quantity=1,
-                store_id=observation.store_id,
-                listing_id=observation.listing_id,
-            ))
-        except ToolError as exc:
-            if exc.status_code == 409:
-                return False
-            raise
+        # A gated purchase is part of verification; an ungated one is just a call.
+        with verification_scope(tools, enabled=verify):
+            try:
+                cart = tools.add_to_cart(CartSelection(
+                    product_id=product.product_id,
+                    quantity=1,
+                    store_id=observation.store_id,
+                    listing_id=observation.listing_id,
+                ))
+            except ToolError as exc:
+                if exc.status_code == 409:
+                    return False
+                raise
         if verify and (
             len(cart.items) != 1
             or cart.items[0].product_id != product.product_id
@@ -323,16 +326,19 @@ class OfflineAgent:
 
         if self.condition == "full":
             # The verification gate: refresh the chosen listing and re-check
-            # hard constraints and stock before touching the cart.
-            fresh = tools.get_listing(
-                chosen.product.product_id,
-                store_id=chosen.store_id,
-                listing_id=chosen.listing_id,
-            )
-            if not eligible(fresh, constraints):
-                return self._no_match(diagnostics)
-            if tools.inspect_cart().items:
-                raise ValueError("cart was not empty before purchase")
+            # hard constraints and stock before touching the cart. These calls
+            # are labelled verification so the report can separate them from the
+            # exploration calls above; each one still spends exactly one call.
+            with verification_scope(tools):
+                fresh = tools.get_listing(
+                    chosen.product.product_id,
+                    store_id=chosen.store_id,
+                    listing_id=chosen.listing_id,
+                )
+                if not eligible(fresh, constraints):
+                    return self._no_match(diagnostics)
+                if tools.inspect_cart().items:
+                    raise ValueError("cart was not empty before purchase")
             chosen = fresh
 
         return self._complete(chosen, diagnostics, tools)
